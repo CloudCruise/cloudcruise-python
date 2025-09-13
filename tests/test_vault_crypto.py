@@ -2,7 +2,6 @@ import unittest
 
 from cloudcruise.vault.utils import encrypt_data, decrypt_data
 
-
 class TestVaultCrypto(unittest.TestCase):
     def test_encrypt_decrypt_roundtrip(self):
         key_hex = "a" * 64  # 32 bytes hex

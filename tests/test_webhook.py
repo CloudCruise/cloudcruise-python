@@ -6,11 +6,9 @@ import unittest
 
 from cloudcruise.webhook.client import WebhookClient
 
-
 def _sign(body: str, secret: str) -> str:
     mac = hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
     return f"sha256={mac}"
-
 
 class TestWebhook(unittest.TestCase):
     def test_verify_signature_ok(self):
@@ -20,7 +18,6 @@ class TestWebhook(unittest.TestCase):
         sig = _sign(body_str, "sekrit")
         verified = client.verify_signature(body_str, sig, "sekrit")
         self.assertEqual(verified["event"], "execution.success")
-
 
     def test_verify_signature_expired_rejected(self):
         client = WebhookClient()
