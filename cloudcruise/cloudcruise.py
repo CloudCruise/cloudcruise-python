@@ -79,10 +79,9 @@ class CloudCruise:
 
             ctype = resp.headers.get("content-type", "")
             if "application/json" in ctype:
-                j = resp.json()
-                return j.get("data", j)
+                return resp.json()
+
             else:
                 return resp.text
         except Exception as e:
             raise e
-

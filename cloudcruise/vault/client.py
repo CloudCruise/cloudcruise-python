@@ -50,11 +50,31 @@ class VaultClient:
             entries = [decrypt_sensitive_fields(e, self._encryption_key) for e in entries]
         return entries
 
-    def update(self, id: str, updates: Dict[str, Any]) -> VaultEntry:
-        entry = {"id": id, **updates}
-        processed = encrypt_sensitive_fields(entry, self._encryption_key)
+    def update(self, updates: Dict[str, Any]) -> VaultEntry:
+        """
+        Updates an existing vault entry
+        Required fields: permissioned_user_id, user_name, password, domain
+        """
+        if not updates.get("permissioned_user_id"):
+            raise ValueError("permissioned_user_id is required for vault updates")
+        if not updates.get("user_name"):
+            raise ValueError("user_name is required for vault updates")
+        if not updates.get("password"):
+            raise ValueError("password is required for vault updates")
+        if not updates.get("domain"):
+            raise ValueError("domain is required for vault updates")
+
+        processed = encrypt_sensitive_fields(dict(updates), self._encryption_key)
         response = self._make_request("PUT", "/vault", processed)
         return decrypt_sensitive_fields(response, self._encryption_key)
 
-    def delete(self, domain: str, permissioned_user_id: str) -> None:
-        self._make_request("DELETE", "/vault", {"domain": domain, "permissioned_user_id": permissioned_user_id})
+    def delete(self, params: Dict[str, str]) -> None:
+        """
+        Deletes a vault entry by domain and permissioned_user_id
+        params: { "domain": str, "permissioned_user_id": str }
+        """
+        if not params.get("domain"):
+            raise ValueError("domain is required to delete a vault entry")
+        if not params.get("permissioned_user_id"):
+            raise ValueError("permissioned_user_id is required to delete a vault entry")
+        self._make_request("DELETE", "/vault", params)
