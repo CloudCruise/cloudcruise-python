@@ -1,4 +1,7 @@
-from .client import WorkflowsClient
+from __future__ import annotations
+
+from typing import Any, Dict
+
 from .types import (
     Workflow,
     WorkflowInputSchema,
@@ -6,13 +9,28 @@ from .types import (
     WorkflowPropertySchema,
     InputValidationError,
 )
+from .. import client as _client
 
 __all__ = [
-    "WorkflowsClient",
     "Workflow",
     "WorkflowInputSchema",
     "WorkflowMetadata",
     "WorkflowPropertySchema",
     "InputValidationError",
+    # Convenience APIs
+    "get_all_workflows",
+    "get_workflow_metadata",
+    "validate_workflow_input",
 ]
 
+
+def get_all_workflows() -> list[Workflow]:
+    return _client().workflows.get_all_workflows()
+
+
+def get_workflow_metadata(workflow_id: str) -> WorkflowMetadata:
+    return _client().workflows.get_workflow_metadata(workflow_id)
+
+
+def validate_workflow_input(workflow_id: str, payload: Dict[str, Any]) -> None:
+    return _client().workflows.validate_workflow_input(workflow_id, payload)

@@ -1,10 +1,5 @@
 from .cloudcruise import CloudCruise, CloudCruiseParams
 
-from .vault.client import VaultClient
-from .workflows.client import WorkflowsClient
-from .runs.client import RunsClient
-from .webhook.client import WebhookClient
-
 from .vault.types import (
     VaultEntry,
     GetVaultEntriesFilters,
@@ -44,7 +39,7 @@ from .runs.types import (
 
 from .webhook.types import WebhookPayload, WebhookVerificationOptions, VerificationError
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 # Help type checkers and IDEs discover subpackages as attributes of the package
 if TYPE_CHECKING:  # pragma: no cover
@@ -56,10 +51,8 @@ if TYPE_CHECKING:  # pragma: no cover
 __all__ = [
     "CloudCruise",
     "CloudCruiseParams",
-    "VaultClient",
-    "WorkflowsClient",
-    "RunsClient",
-    "WebhookClient",
+    # Default client helper
+    "client",
     # Subpackages (for discoverability)
     "workflows",
     "vault",
@@ -105,3 +98,13 @@ def __getattr__(name: str):  # PEP 562
         import importlib
         return importlib.import_module(f".{name}", __name__)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+# Provide a cached default client built from environment variables unless
+# explicit parameters are provided. Enables module-level convenience APIs.
+_default_client: Optional[CloudCruise] = None
+
+def client(params: Optional[CloudCruiseParams] = None) -> CloudCruise:
+    global _default_client
+    if params is not None or _default_client is None:
+        _default_client = CloudCruise(params)
+    return _default_client
