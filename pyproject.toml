@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cloudcruise"
-version = "0.1.0"
+version = "0.0.1a1"
 description = "CloudCruise Python SDK: workflows, runs, vault, webhook verification"
 readme = "README.md"
 requires-python = ">=3.10"
