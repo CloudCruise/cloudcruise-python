@@ -25,6 +25,12 @@ class CloudCruise:
     Official client library for the CloudCruise Platform
     """
 
+    # Expose typed attributes for IDE autocomplete
+    vault: VaultClient
+    workflows: WorkflowsClient
+    runs: RunsClient
+    webhook: WebhookClient
+
     def __init__(self, params: Optional[CloudCruiseParams] = None) -> None:
         params = params or CloudCruiseParams()
         api_key = params.api_key or get_env("CLOUDCRUISE_API_KEY")
