@@ -9,7 +9,10 @@ from .types import (
     WorkflowPropertySchema,
     InputValidationError,
 )
-from .._default import get_client as _client
+def _client():
+    # Lazy import to avoid circular imports during package initialization
+    from .._default import get_client as _get_client
+    return _get_client()
 
 __all__ = [
     "Workflow",
