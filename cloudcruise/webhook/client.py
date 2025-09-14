@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from .utils import verify_message
 from .types import WebhookPayload, WebhookVerificationOptions
@@ -12,10 +12,10 @@ class WebhookClient:
 
     def verify_signature(
         self,
-        received_data: Any,
+        raw_body: bytes,
         received_signature: str,
         secret_key: str,
         options: Optional[WebhookVerificationOptions] = None,
     ) -> WebhookPayload:
-        return verify_message(received_data, received_signature, secret_key, options)
+        return verify_message(raw_body, received_signature, secret_key, options)
 

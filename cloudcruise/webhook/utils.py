@@ -3,7 +3,6 @@ from __future__ import annotations
 import hmac
 import hashlib
 import json
-from typing import Any
 
 from .types import VerificationError, WebhookPayload, WebhookVerificationOptions
 
@@ -23,27 +22,27 @@ def _verify_hmac(received_data: str, received_signature: str, secret_key: str) -
 
 
 def verify_message(
-    received_data: Any,
+    raw_body: bytes,
     received_signature: str,
     secret_key: str,
     options: WebhookVerificationOptions | None = None,
 ) -> WebhookPayload:
-    if not received_data:
+    if not raw_body:
         raise VerificationError("Received request without body", 400)
     if not received_signature:
         raise VerificationError("Missing HMAC signature", 400)
     if not secret_key:
         raise VerificationError("Missing secret key", 400)
 
-    if isinstance(received_data, str):
-        data_string = received_data
-        try:
-            data_json = json.loads(received_data)
-        except Exception as e:
-            raise VerificationError(f"Failed to decode JSON: {str(e)}", 400)
-    else:
-        data_json = received_data
-        data_string = json.dumps(received_data)
+    try:
+        data_string = raw_body.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise VerificationError(f"Failed to decode body as UTF-8: {str(e)}", 400)
+
+    try:
+        data_json = json.loads(data_string)
+    except Exception as e:
+        raise VerificationError(f"Failed to decode JSON: {str(e)}", 400)
 
     expires_at = data_json.get("expires_at")
     if not expires_at:
