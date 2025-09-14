@@ -81,23 +81,5 @@ class TestLiveStaging(unittest.TestCase):
         # Delete
         self.client.vault.delete({"domain": VAULT_DOMAIN, "permissioned_user_id": VAULT_USER_ID})
 
-    @unittest.skipIf(True, "runs test skipped")
-    def test_runs_start(self):
-        if not RUN_WORKFLOW_ID or not RUN_INPUT_JSON:
-            self.skipTest("Set RUN_WORKFLOW_ID and RUN_INPUT_JSON in this file to run")
-
-        try:
-            inputs = json.loads(RUN_INPUT_JSON)
-        except Exception as e:
-            self.skipTest(f"Invalid RUN_INPUT_JSON: {e}")
-
-        req = StartRunRequest(workflow_id=RUN_WORKFLOW_ID, run_input_variables=inputs)
-        handle = self.client.runs.start(req)
-        self.assertTrue(getattr(handle, "sessionId", None))
-
-        # Let SSE open briefly, then close to avoid long test times
-        time.sleep(5)
-        handle.close()
-
 if __name__ == "__main__":
     unittest.main(verbosity=2)
