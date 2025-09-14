@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from .types import VaultEntry, GetVaultEntriesFilters, ProxyConfig, VaultPostPutHeadersInBody
-from .. import client as _client
+from .._default import get_client as _client
 
 __all__ = [
     "VaultEntry",

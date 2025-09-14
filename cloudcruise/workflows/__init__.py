@@ -9,7 +9,7 @@ from .types import (
     WorkflowPropertySchema,
     InputValidationError,
 )
-from .. import client as _client
+from .._default import get_client as _client
 
 __all__ = [
     "Workflow",

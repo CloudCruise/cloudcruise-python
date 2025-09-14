@@ -38,6 +38,7 @@ from .runs.types import (
 )
 
 from .webhook.types import WebhookPayload, WebhookVerificationOptions, VerificationError
+from ._default import get_client as client
 
 from typing import TYPE_CHECKING, Optional
 
@@ -98,13 +99,3 @@ def __getattr__(name: str):  # PEP 562
         import importlib
         return importlib.import_module(f".{name}", __name__)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-# Provide a cached default client built from environment variables unless
-# explicit parameters are provided. Enables module-level convenience APIs.
-_default_client: Optional[CloudCruise] = None
-
-def client(params: Optional[CloudCruiseParams] = None) -> CloudCruise:
-    global _default_client
-    if params is not None or _default_client is None:
-        _default_client = CloudCruise(params)
-    return _default_client

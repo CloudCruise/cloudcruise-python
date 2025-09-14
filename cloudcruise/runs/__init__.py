@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .types import *  # re-export types for convenience
-from .. import client as _client
+from .._default import get_client as _client
 
 __all__ = [
     "EventType",
