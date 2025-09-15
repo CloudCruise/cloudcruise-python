@@ -25,15 +25,15 @@ Python 3.10 or newer is required. The package ships with type hints (`py.typed`)
 ## Quick Start
 
 ```python
-from cloudcruise import CloudCruise, CloudCruiseParams
+from cloudcruise import CloudCruise
 from cloudcruise.runs.types import StartRunRequest
 
 client = CloudCruise(
-    CloudCruiseParams(
-        api_key="<CLOUDCRUISE_API_KEY>",
-        encryption_key="<CLOUDCRUISE_ENCRYPTION_KEY>"
-    )
+    api_key="<CLOUDCRUISE_API_KEY>",
+    encryption_key="<CLOUDCRUISE_ENCRYPTION_KEY>",
 )
+# Alternatively, set CLOUDCRUISE_API_KEY and CLOUDCRUISE_ENCRYPTION_KEY
+# environment variables and instantiate with `client = CloudCruise()`.
 
 run = client.runs.start(
     StartRunRequest(
