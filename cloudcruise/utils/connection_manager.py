@@ -122,9 +122,24 @@ class ConnectionManager:
                 self._emit_all("ping", evt)
                 return
             if evt.get("event") == "run.event":
-                data = evt.get("data") or {}
-                payload = data.get("payload") or {}
-                session_id = payload.get("session_id")
+                raw_data = evt.get("data")
+                data: Dict[str, Any] = {}
+                if isinstance(raw_data, dict):
+                    inner = raw_data.get("data")
+                    if isinstance(inner, dict):
+                        data = inner
+                    else:
+                        data = raw_data
+                payload = data.get("payload") if isinstance(data, dict) else None
+                session_id = None
+                if isinstance(payload, dict):
+                    val = payload.get("session_id") or payload.get("sessionId")
+                    if isinstance(val, str):
+                        session_id = val
+                if session_id is None and isinstance(data, dict):
+                    val = data.get("session_id") or data.get("sessionId")
+                    if isinstance(val, str):
+                        session_id = val
                 if not session_id:
                     return
                 ch = self._sessions.get(session_id)
@@ -195,4 +210,3 @@ class ConnectionManager:
 
         t = threading.Thread(target=worker, name="cloudcruise-reconnect", daemon=True)
         t.start()
-

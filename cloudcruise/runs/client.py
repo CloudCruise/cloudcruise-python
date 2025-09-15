@@ -42,7 +42,13 @@ class RunsClient:
             dict(request) if isinstance(request, dict) else request.__dict__
         )
         resp = self._make_request("POST", "/run", payload)
-        session_id = resp.get("session_id") if isinstance(resp, dict) else resp["session_id"]
+        session_id: Optional[str]
+        if isinstance(resp, dict):
+            session_id = resp.get("session_id") or resp.get("sessionId")
+        else:
+            session_id = getattr(resp, "session_id", None) or getattr(resp, "sessionId", None)
+        if not session_id:
+            raise RuntimeError("CloudCruise start run response did not include session_id")
         return self.subscribe_to_session(session_id, options)
 
     def subscribe_to_session(self, session_id: str, options: Optional[RunStreamOptions] = None) -> RunHandle:
