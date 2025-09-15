@@ -11,7 +11,6 @@ from .types import (
     InvalidTypeDetail,
 )
 
-
 class WorkflowsClient:
     def __init__(self, make_request) -> None:
         self._make_request = make_request
@@ -25,10 +24,30 @@ class WorkflowsClient:
 
     def validate_workflow_input(self, workflow_id: str, payload: Dict[str, Any]) -> None:
         meta = self.get_workflow_metadata(workflow_id)
-        schema: WorkflowInputSchema = meta.input_schema or WorkflowInputSchema()
-        properties = schema.properties or {}
-        required = schema.required or []
-        disallow_extras = (schema.additionalProperties is False)
+
+        raw_schema: Any = None
+        if isinstance(meta, dict):
+            if "input_schema" in meta:
+                raw_schema = meta.get("input_schema")
+            else:
+                m = meta.get("metadata") if isinstance(meta.get("metadata"), dict) else None
+                if isinstance(m, dict):
+                    raw_schema = m.get("input_schema")
+        else:
+            try:
+                raw_schema = getattr(meta, "input_schema", None)
+            except Exception:
+                raw_schema = None
+
+        if isinstance(raw_schema, dict):
+            properties = raw_schema.get("properties") or {}
+            required = raw_schema.get("required") or []
+            disallow_extras = (raw_schema.get("additionalProperties") is False)
+        else:
+            schema: WorkflowInputSchema = raw_schema or WorkflowInputSchema()
+            properties = schema.properties or {}
+            required = schema.required or []
+            disallow_extras = (schema.additionalProperties is False)
 
         missing_required = [k for k in required if k not in payload]
 

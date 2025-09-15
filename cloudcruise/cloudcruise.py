@@ -62,10 +62,13 @@ class CloudCruise:
         """
         url = f"{self._base_url}{path}"
         headers = {
-            "Content-Type": "application/json",
             "cc-key": self._api_key,
         }
         try:
+            # Only send Content-Type when we have a JSON body
+            if body is not None:
+                headers["Content-Type"] = "application/json"
+
             resp = requests.request(
                 method=method,
                 url=url,
