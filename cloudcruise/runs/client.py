@@ -65,6 +65,36 @@ class RunsClient:
         def is_terminal(status: Optional[str]) -> bool:
             return status in {"execution.success", "execution.failed", "execution.stopped"}
 
+        def flatten_event(msg: Dict[str, Any]) -> Dict[str, Any]:
+            """
+            Flatten the nested SSE event structure for better UX.
+            Transforms:
+              {
+                'event': 'run.event',
+                'data': {
+                  'event': 'execution.start',
+                  'payload': {...},
+                  'timestamp': ...
+                }
+              }
+            Into:
+              {
+                'type': 'execution.start',
+                'payload': {...},
+                'timestamp': ...,
+                '_raw': {...}  # original message
+              }
+            """
+            data = msg.get("data", {})
+            flattened = {
+                "type": data.get("event"),
+                "payload": data.get("payload", {}),
+                "timestamp": data.get("timestamp"),
+                "expires_at": data.get("expires_at"),
+                "_raw": msg,
+            }
+            return flattened
+
         def emit(event: str, payload: Any | None = None) -> None:
             emitter.emit(event, payload)
             if event in ("run.event", "ping"):
@@ -97,9 +127,25 @@ class RunsClient:
                 m = msg  # expected dict
                 if not isinstance(m, dict) or m.get("event") != "run.event":
                     return
+
+                # Flatten the event for better UX
+                flattened = flatten_event(m)
+                event_type = flattened.get("type")
+
+                # Push original message to stream for iteration
                 stream.push(m)  # type: ignore
-                emit("run.event", m)
-                event_type = (m.get("data") or {}).get("event")
+
+                # Emit flattened event to 'run.event' listeners
+                emit("run.event", flattened)
+
+                # Also emit to type-specific listeners (e.g., 'execution.start')
+                # This matches the JS SDK behavior and provides better DX
+                if event_type and isinstance(event_type, str):
+                    try:
+                        emit(event_type, flattened)
+                    except Exception:
+                        pass  # Ignore errors in type-specific emission
+
                 if isinstance(event_type, str) and is_terminal(event_type):
                     end_and_cleanup(event_type)
 

@@ -55,27 +55,11 @@ from .runs.types import (
 from .webhook.types import WebhookPayload, WebhookVerificationOptions, VerificationError, WebhookMessage
 from ._default import get_client as client
 
-from typing import TYPE_CHECKING, Optional
-
-# Import submodules explicitly for IDE autocomplete/IntelliSense
-# These imports make the submodules discoverable by IDEs
-from . import workflows as workflows
-from . import vault as vault
-from . import runs as runs
-from . import webhook as webhook
-from . import events as events
-
 __all__ = [
     "CloudCruise",
     "CloudCruiseParams",
     # Default client helper
     "client",
-    # Subpackages (for discoverability)
-    "workflows",
-    "vault",
-    "runs",
-    "webhook",
-    "events",
     # Vault Types
     "VaultEntry",
     "GetVaultEntriesFilters",

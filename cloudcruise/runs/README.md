@@ -54,17 +54,26 @@ handle = client.runs.start(
     )
 )
 
-# Listen to specific events
+# Listen to all events with flattened structure
 def on_run_event(event):
-    data = (event or {}).get("data") or {}
-    print("Event:", data.get("event"))
-    print("Payload:", data.get("payload"))
+    print("Event type:", event["type"])
+    print("Payload:", event["payload"])
+    print("Timestamp:", event["timestamp"])
 
-handle.on("run.event", on_run_event) # or use lambdas
+handle.on("run.event", on_run_event)
+
+# Or use type-specific listeners for cleaner code
+handle.on("execution.start", lambda e: print(f"Started: {e['payload']['workflow_id']}"))
+handle.on("execution.step", lambda e: print(f"Step: {e['payload']['current_step']} -> {e['payload']['next_step']}"))
+handle.on("screenshot.uploaded", lambda e: print(f"Screenshot: {e['payload']['screenshot_id']}"))
+handle.on("execution.success", lambda e: print(f"Success! Data: {e['payload'].get('data')}"))
+handle.on("execution.failed", lambda e: print(f"Failed: {e['payload'].get('errors')}"))
+
+# Handle errors and completion
 handle.on("error", lambda err: print("Stream error:", err))
-handle.on("end", lambda info=None: print("Workflow ended:", (info or {}).get("type")))
+handle.on("end", lambda info: print("Workflow ended:", info.get("type")))
 
-# Use iteration for streaming messages (run.event + ping)
+# Use iteration for streaming raw SSE messages (for advanced use cases)
 for message in handle:
     if message.get("event") == "run.event":
         event_name = (message.get("data") or {}).get("event")
@@ -79,9 +88,24 @@ See the [CloudCruise documentation](https://docs.cloudcruise.com/run-api/submit-
 for additional context.
 
 ```python
+# Using type-specific listener (recommended)
+def on_interaction_waiting(event):
+    print("Workflow paused, submitting input...")
+    print("Missing fields:", event["payload"]["missing_properties"])
+    client.runs.submit_user_interaction(
+        handle.sessionId,
+        {
+            "field1": "user_provided_value",
+            "field2": 42,
+            "confirmation": True,
+        },
+    )
+
+handle.on("interaction.waiting", on_interaction_waiting)
+
+# Or using generic listener
 def maybe_submit_input(event):
-    data = (event or {}).get("data") or {}
-    if data.get("event") == "interaction.waiting":
+    if event["type"] == "interaction.waiting":
         print("Workflow paused, submitting input...")
         client.runs.submit_user_interaction(
             handle.sessionId,
@@ -141,15 +165,51 @@ Each `RunHandle` also exposes:
 
 ## Event Types
 
-Run events emit the following terminal statuses:
+### Flattened Event Structure
 
-- `execution.success`
-- `execution.failed`
-- `execution.stopped`
+All events are delivered with a flattened structure for improved developer experience:
 
-Non-terminal events include `execution.queued`, `execution.start`,
-`execution.step`, `interaction.waiting`, and more. Inspect
-`cloudcruise/runs/types.py` (`EventType`) for the full list.
+```python
+{
+    "type": "execution.start",        # Event type
+    "payload": {...},                  # Event-specific data
+    "timestamp": 1234567890,           # Event timestamp
+    "expires_at": 1234567890,          # Expiration timestamp
+    "_raw": {...}                      # Original SSE message (for advanced use)
+}
+```
+
+### Type-Specific Listeners
+
+You can listen to specific event types instead of filtering manually:
+
+```python
+# Instead of this:
+handle.on("run.event", lambda e: print(e["payload"]) if e["type"] == "execution.start" else None)
+
+# Do this:
+handle.on("execution.start", lambda e: print(e["payload"]))
+```
+
+### Available Event Types
+
+**Terminal events** (workflow ends after these):
+- `execution.success` – Workflow completed successfully
+- `execution.failed` – Workflow failed with errors
+- `execution.stopped` – Workflow was interrupted
+
+**Non-terminal events**:
+- `execution.queued` – Workflow queued for execution
+- `execution.start` – Workflow execution started
+- `execution.step` – Workflow progressed to next step
+- `execution.requeued` – Workflow requeued for retry
+- `interaction.waiting` – Workflow waiting for user input
+- `interaction.finished` – User input received
+- `screenshot.uploaded` – Screenshot captured
+- `file.uploaded` – File uploaded
+- `agent.error_analysis` – Error analysis completed
+
+See `cloudcruise/runs/types.py` (`EventType`) and `cloudcruise/events/types.py` for complete type definitions and payload structures.
 
 ---
 
