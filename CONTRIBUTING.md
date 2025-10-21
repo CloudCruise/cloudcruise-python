@@ -73,6 +73,44 @@ Verify the installation:
 python -c "from cloudcruise import CloudCruise; print('Installed successfully!')"
 ```
 
+### IDE Support & Type Checking
+
+The cloudcruise package includes full type hints and a `py.typed` marker for
+type checker support. However, **editable installs (`pip install -e .`) can
+cause issues with IDE autocomplete and type checkers like Pyright/Pylance**.
+
+#### For Development with Full IDE Support
+
+If you need autocomplete, intellisense, and type checking to work properly:
+
+1. **Build the package**:
+   ```bash
+   python -m build
+   ```
+
+2. **Install the built package** (instead of editable mode):
+   ```bash
+   pip install dist/cloudcruise-0.0.1-py3-none-any.whl
+   ```
+
+3. **After making code changes**, rebuild and reinstall:
+   ```bash
+   python -m build && pip install --force-reinstall dist/cloudcruise-0.0.1-py3-none-any.whl
+   ```
+
+#### Why This Matters
+
+- **Editable install**: Changes are immediately reflected, but IDEs may not find
+  type information properly
+- **Built install**: IDEs get full autocomplete and type checking, but requires
+  rebuild after each change
+
+**Recommended workflow**:
+- Use editable install for rapid development and testing
+- Build and install when you need to verify IDE experience or type hints
+- Always build and install before opening pull requests to verify the end-user
+  experience
+
 ### Running Tests
 
 ```bash
