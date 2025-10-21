@@ -47,6 +47,32 @@ pip install -e ".[dev]"  # installs package + dev dependencies (ruff, mypy, etc.
 # Or install without dev dependencies: pip install -e .
 ```
 
+### Installing Locally in Another Project
+
+To test your cloudcruise-python changes in another project without publishing to
+PyPI, install it in editable mode from the local directory:
+
+```bash
+# From your other project's directory
+cd /path/to/your-other-project
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install cloudcruise in editable mode using the full path
+pip install -e /path/to/cloudcruise-python
+
+# Or with dev dependencies
+pip install -e "/path/to/cloudcruise-python[dev]"
+```
+
+**Editable mode benefits:** Any changes you make to cloudcruise-python code are
+immediately reflected in your other project without reinstalling.
+
+Verify the installation:
+
+```bash
+python -c "from cloudcruise import CloudCruise; print('Installed successfully!')"
+```
+
 ### Running Tests
 
 ```bash
@@ -172,4 +198,3 @@ For pre-releases (e.g., `0.0.2a1`), bump the version accordingly in
 - **API Docs:** <https://docs.cloudcruise.com>
 
 Thanks again for helping improve the CloudCruise Python SDK!
-

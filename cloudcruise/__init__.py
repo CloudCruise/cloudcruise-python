@@ -57,13 +57,13 @@ from ._default import get_client as client
 
 from typing import TYPE_CHECKING, Optional
 
-# Help type checkers and IDEs discover subpackages as attributes of the package
-if TYPE_CHECKING:  # pragma: no cover
-    from . import workflows as workflows
-    from . import vault as vault
-    from . import runs as runs
-    from . import webhook as webhook
-    from . import events as events
+# Import submodules explicitly for IDE autocomplete/IntelliSense
+# These imports make the submodules discoverable by IDEs
+from . import workflows as workflows
+from . import vault as vault
+from . import runs as runs
+from . import webhook as webhook
+from . import events as events
 
 __all__ = [
     "CloudCruise",
@@ -128,10 +128,3 @@ __all__ = [
     "VerificationError",
     "WebhookMessage",
 ]
-
-# Lazy import subpackages so `cloudcruise.workflows` etc. are available without explicit import
-def __getattr__(name: str):  # PEP 562
-    if name in {"workflows", "vault", "runs", "webhook", "events"}:
-        import importlib
-        return importlib.import_module(f".{name}", __name__)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
