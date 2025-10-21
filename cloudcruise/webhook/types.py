@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from ..runs.types import EventType
+from ..events.types import WebhookMessage
 
 
 class VerificationError(Exception):
@@ -18,6 +19,16 @@ class WebhookPayload:
     expires_at: int
     # Allow arbitrary extra fields
     # mypy: ignore dynamic attributes
+
+
+# Re-export WebhookMessage for convenience and type checking
+# This provides the full typed webhook message structure
+__all__ = [
+    "VerificationError",
+    "WebhookPayload",
+    "WebhookVerificationOptions",
+    "WebhookMessage",
+]
 
 
 @dataclass

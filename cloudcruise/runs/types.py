@@ -3,6 +3,24 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, TypedDict, Union
 
+# Import event payload types for re-export
+from ..events.types import (
+    ExecutionQueuedPayload,
+    ExecutionStartPayload,
+    ExecutionStepPayload,
+    InteractionWaitingPayload,
+    InteractionFinishedPayload,
+    AgentErrorAnalysisPayload,
+    ExecutionRequeuedPayload,
+    EndRunPayload,
+    EndRunError,
+    ExecutionStoppedEarlyPayload,
+    FileUploadedPayload,
+    ScreenshotUploadedPayload,
+    WebhookMessage as EventWebhookMessage,
+    RunEventMessage,
+)
+
 
 EventType = Literal[
     "execution.queued",
@@ -19,6 +37,7 @@ EventType = Literal[
     "interaction.waiting",
     "interaction.finished",
     "interaction.failed",
+    "agent.error_analysis",
 ]
 
 
@@ -176,4 +195,47 @@ class RunHandle(Protocol):
 
     def __iter__(self) -> Iterator[SseMessage]:
         ...
+
+
+# Export all types including event payloads
+__all__ = [
+    # Core types
+    "EventType",
+    "DryRun",
+    "Metadata",
+    "RunSpecificWebhook",
+    "PayloadWebhook",
+    "StartRunRequest",
+    "StartRunResponse",
+    "UserInteractionData",
+    "VideoUrl",
+    "FileUrl",
+    "ScreenshotUrl",
+    "RunError",
+    "RunResult",
+    "WebhookEvent",
+    "WebhookReplayResponse",
+    "SseEventName",
+    "RunEventData",
+    "RunEventEnvelope",
+    "PingEnvelope",
+    "SseMessage",
+    "RunStreamOptions",
+    "RunHandle",
+    # Event payload types (re-exported from events.types)
+    "ExecutionQueuedPayload",
+    "ExecutionStartPayload",
+    "ExecutionStepPayload",
+    "InteractionWaitingPayload",
+    "InteractionFinishedPayload",
+    "AgentErrorAnalysisPayload",
+    "ExecutionRequeuedPayload",
+    "EndRunPayload",
+    "EndRunError",
+    "ExecutionStoppedEarlyPayload",
+    "FileUploadedPayload",
+    "ScreenshotUploadedPayload",
+    "EventWebhookMessage",
+    "RunEventMessage",
+]
 

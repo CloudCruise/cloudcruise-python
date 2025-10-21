@@ -25,8 +25,7 @@ Python 3.10 or newer is required. The package ships with type hints (`py.typed`)
 ## Quick Start
 
 ```python
-from cloudcruise import CloudCruise
-from cloudcruise.runs.types import StartRunRequest
+from cloudcruise import CloudCruise, StartRunRequest
 
 client = CloudCruise(
     api_key="<CLOUDCRUISE_API_KEY>",
@@ -42,8 +41,14 @@ run = client.runs.start(
     )
 )
 
-run.on("run.event", lambda event: print("RUN:", event))
-run.on("end", lambda info=None: print("RUN COMPLETE", info))
+# Listen to specific event types (recommended - clean and type-safe)
+run.on("execution.start", lambda e: print(f"Workflow started: {e['payload']['workflow_id']}"))
+run.on("execution.step", lambda e: print(f"Step: {e['payload']['current_step']}"))
+run.on("execution.success", lambda e: print(f"Success! Output: {e['payload'].get('data')}"))
+run.on("end", lambda info: print(f"Run completed: {info['type']}"))
+
+# Or use generic listener for all events (flattened structure)
+# run.on("run.event", lambda event: print(f"{event['type']}: {event['payload']}"))
 
 # Block until the run finishes and fetch final results
 result = run.wait()
@@ -77,8 +82,7 @@ Quick start:
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .
-pip install python-dotenv  # needed for live staging tests
+pip install -e ".[dev]"  # installs package + dev dependencies
 
 # Run the unit test suite
 python -m unittest discover -s tests -p "test_*.py" -v

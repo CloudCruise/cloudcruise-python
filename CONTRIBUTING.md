@@ -43,9 +43,76 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 pip install --upgrade pip
-pip install -e .
-pip install python-dotenv  # needed for live staging tests
+pip install -e ".[dev]"  # installs package + dev dependencies (ruff, mypy, etc.)
+# Or install without dev dependencies: pip install -e .
 ```
+
+### Installing Locally in Another Project
+
+To test your cloudcruise-python changes in another project without publishing to
+PyPI, install it in editable mode from the local directory:
+
+```bash
+# From your other project's directory
+cd /path/to/your-other-project
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install cloudcruise in editable mode using the full path
+pip install -e /path/to/cloudcruise-python
+
+# Or with dev dependencies
+pip install -e "/path/to/cloudcruise-python[dev]"
+```
+
+**Editable mode benefits:** Any changes you make to cloudcruise-python code are
+immediately reflected in your other project without reinstalling.
+
+Verify the installation:
+
+```bash
+python -c "from cloudcruise import CloudCruise; print('Installed successfully!')"
+```
+
+### IDE Support & Type Checking
+
+The cloudcruise package includes full type hints and a `py.typed` marker for
+type checker support. However, **editable installs (`pip install -e .`) can
+cause issues with IDE autocomplete and type checkers like Pyright/Pylance**.
+
+#### For Development with Full IDE Support
+
+If you need autocomplete, intellisense, and type checking to work properly:
+
+1. **Build the package**:
+
+   ```bash
+   python -m build
+   ```
+
+2. **Install the built package** (instead of editable mode):
+
+   ```bash
+   pip install dist/cloudcruise-0.0.1-py3-none-any.whl
+   ```
+
+3. **After making code changes**, rebuild and reinstall:
+   ```bash
+   python -m build && pip install --force-reinstall dist/cloudcruise-0.0.1-py3-none-any.whl
+   ```
+
+#### Why This Matters
+
+- **Editable install**: Changes are immediately reflected, but IDEs may not find
+  type information properly
+- **Built install**: IDEs get full autocomplete and type checking, but requires
+  rebuild after each change
+
+**Recommended workflow**:
+
+- Use editable install for rapid development and testing
+- Build and install when you need to verify IDE experience or type hints
+- Always build and install before opening pull requests to verify the end-user
+  experience
 
 ### Running Tests
 
@@ -148,7 +215,8 @@ To cut a new release to PyPI:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install --upgrade pip build twine
+pip install --upgrade pip
+pip install -e ".[dev]"  # includes build and twine
 
 # Update version in pyproject.toml
 python -m build            # generates dist/*.tar.gz and dist/*.whl
@@ -158,9 +226,9 @@ git tag vX.Y.Z
 git push origin main --tags
 ```
 
-For pre-releases (e.g., `0.0.1a2`), bump the version accordingly in
+For pre-releases (e.g., `0.0.2a1`), bump the version accordingly in
 `pyproject.toml` before building. Consumers can then run
-`pip install cloudcruise==0.0.1a2`.
+`pip install cloudcruise==0.0.2a1`.
 
 ---
 
@@ -171,4 +239,3 @@ For pre-releases (e.g., `0.0.1a2`), bump the version accordingly in
 - **API Docs:** <https://docs.cloudcruise.com>
 
 Thanks again for helping improve the CloudCruise Python SDK!
-
