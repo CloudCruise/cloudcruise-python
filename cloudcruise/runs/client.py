@@ -156,10 +156,17 @@ class RunsClient:
                     finally:
                         done.set()
 
+                def on_error(err):
+                    result_container["error"] = err
+                    done.set()
+
                 off_end = self.on("end", on_end)
-                off_err = self.on("error", lambda e: done.set())
+                off_err = self.on("error", on_error)
                 done.wait()
                 try:
+                    if "error" in result_container:
+                        err = result_container["error"]
+                        raise err if isinstance(err, Exception) else RuntimeError(f"SSE error: {err}")
                     return result_container["result"]
                 finally:
                     try:

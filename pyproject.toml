@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cloudcruise"
-version = "0.0.1a1"
+version = "0.0.1"
 description = "CloudCruise Python SDK: workflows, runs, vault, webhook verification"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "CloudCruise", email = "support@cloudcruise.com" }]
-license = { text = "Proprietary" }
+license = { text = "MIT License" }
 dependencies = [
   "requests>=2.31.0",
   "cryptography>=41.0.0"
@@ -18,9 +18,25 @@ keywords = ["cloudcruise", "sdk", "automation", "workflows", "sse", "webhook"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "License :: Other/Proprietary License",
+  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://cloudcruise.com"
+Documentation = "https://docs.cloudcruise.com"
+Repository = "https://github.com/CloudCruise/cloudcruise-python"
+Issues = "https://github.com/CloudCruise/cloudcruise-python/issues"
+Discord = "https://discord.com/invite/MHjbUqedZF"
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.1.0",
+  "mypy>=1.0.0",
+  "python-dotenv>=1.0.0",
+  "build>=1.0.0",
+  "twine>=4.0.0",
 ]
 
 [tool.setuptools.package-data]

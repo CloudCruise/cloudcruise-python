@@ -43,8 +43,8 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 pip install --upgrade pip
-pip install -e .
-pip install python-dotenv  # needed for live staging tests
+pip install -e ".[dev]"  # installs package + dev dependencies (ruff, mypy, etc.)
+# Or install without dev dependencies: pip install -e .
 ```
 
 ### Running Tests
@@ -148,7 +148,8 @@ To cut a new release to PyPI:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install --upgrade pip build twine
+pip install --upgrade pip
+pip install -e ".[dev]"  # includes build and twine
 
 # Update version in pyproject.toml
 python -m build            # generates dist/*.tar.gz and dist/*.whl
@@ -158,9 +159,9 @@ git tag vX.Y.Z
 git push origin main --tags
 ```
 
-For pre-releases (e.g., `0.0.1a2`), bump the version accordingly in
+For pre-releases (e.g., `0.0.2a1`), bump the version accordingly in
 `pyproject.toml` before building. Consumers can then run
-`pip install cloudcruise==0.0.1a2`.
+`pip install cloudcruise==0.0.2a1`.
 
 ---
 

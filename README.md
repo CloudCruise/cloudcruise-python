@@ -77,8 +77,7 @@ Quick start:
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .
-pip install python-dotenv  # needed for live staging tests
+pip install -e ".[dev]"  # installs package + dev dependencies
 
 # Run the unit test suite
 python -m unittest discover -s tests -p "test_*.py" -v
