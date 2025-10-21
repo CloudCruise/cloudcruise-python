@@ -35,9 +35,24 @@ from .runs.types import (
     SseEventName,
     SseMessage,
     RunEventEnvelope,
+    # Event payload types
+    ExecutionQueuedPayload,
+    ExecutionStartPayload,
+    ExecutionStepPayload,
+    InteractionWaitingPayload,
+    InteractionFinishedPayload,
+    AgentErrorAnalysisPayload,
+    ExecutionRequeuedPayload,
+    EndRunPayload,
+    EndRunError,
+    ExecutionStoppedEarlyPayload,
+    FileUploadedPayload,
+    ScreenshotUploadedPayload,
+    EventWebhookMessage,
+    RunEventMessage,
 )
 
-from .webhook.types import WebhookPayload, WebhookVerificationOptions, VerificationError
+from .webhook.types import WebhookPayload, WebhookVerificationOptions, VerificationError, WebhookMessage
 from ._default import get_client as client
 
 from typing import TYPE_CHECKING, Optional
@@ -48,6 +63,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from . import vault as vault
     from . import runs as runs
     from . import webhook as webhook
+    from . import events as events
 
 __all__ = [
     "CloudCruise",
@@ -59,15 +75,18 @@ __all__ = [
     "vault",
     "runs",
     "webhook",
-    # Types
+    "events",
+    # Vault Types
     "VaultEntry",
     "GetVaultEntriesFilters",
     "ProxyConfig",
     "VaultPostPutHeadersInBody",
+    # Workflow Types
     "Workflow",
     "WorkflowInputSchema",
     "WorkflowMetadata",
     "InputValidationError",
+    # Run Types
     "EventType",
     "DryRun",
     "Metadata",
@@ -88,14 +107,31 @@ __all__ = [
     "SseEventName",
     "SseMessage",
     "RunEventEnvelope",
+    # Event Payload Types
+    "ExecutionQueuedPayload",
+    "ExecutionStartPayload",
+    "ExecutionStepPayload",
+    "InteractionWaitingPayload",
+    "InteractionFinishedPayload",
+    "AgentErrorAnalysisPayload",
+    "ExecutionRequeuedPayload",
+    "EndRunPayload",
+    "EndRunError",
+    "ExecutionStoppedEarlyPayload",
+    "FileUploadedPayload",
+    "ScreenshotUploadedPayload",
+    "EventWebhookMessage",
+    "RunEventMessage",
+    # Webhook Types
     "WebhookPayload",
     "WebhookVerificationOptions",
     "VerificationError",
+    "WebhookMessage",
 ]
 
 # Lazy import subpackages so `cloudcruise.workflows` etc. are available without explicit import
 def __getattr__(name: str):  # PEP 562
-    if name in {"workflows", "vault", "runs", "webhook"}:
+    if name in {"workflows", "vault", "runs", "webhook", "events"}:
         import importlib
         return importlib.import_module(f".{name}", __name__)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
