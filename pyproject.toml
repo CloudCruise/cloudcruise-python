@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cloudcruise"
 version = "0.0.1"
-description = "CloudCruise Python SDK: workflows, runs, vault, webhook verification"
+description = "The official CloudCruise Python SDK"
 readme = "README.md"
 requires-python = ">=3.10"
-authors = [{ name = "CloudCruise", email = "support@cloudcruise.com" }]
+authors = [{ name = "CloudCruise", email = "founders@cloudcruise.com" }]
 license = { text = "MIT License" }
 dependencies = [
   "requests>=2.31.0",

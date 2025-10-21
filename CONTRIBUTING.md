@@ -84,11 +84,13 @@ cause issues with IDE autocomplete and type checkers like Pyright/Pylance**.
 If you need autocomplete, intellisense, and type checking to work properly:
 
 1. **Build the package**:
+
    ```bash
    python -m build
    ```
 
 2. **Install the built package** (instead of editable mode):
+
    ```bash
    pip install dist/cloudcruise-0.0.1-py3-none-any.whl
    ```
@@ -106,6 +108,7 @@ If you need autocomplete, intellisense, and type checking to work properly:
   rebuild after each change
 
 **Recommended workflow**:
+
 - Use editable install for rapid development and testing
 - Build and install when you need to verify IDE experience or type hints
 - Always build and install before opening pull requests to verify the end-user
