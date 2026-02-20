@@ -118,6 +118,8 @@ class RunError:
     error_code: Optional[str] = None
     action_type: Optional[str] = None
     action_display_name: Optional[str] = None
+    llm_error_category: Optional[str] = None
+    original_error: Optional[str] = None
 
 
 @dataclass
