@@ -93,6 +93,7 @@ class EndRunPayload(TypedDict, total=False):
     status: Literal["execution.success", "execution.failed", "execution.stopped"]
     encrypted_variables: Union[List[str], None]
     file_urls: Union[List[Any], None]
+    vault_entries: Union[Dict[str, Any], None]
 
 
 class ExecutionStoppedEarlyPayload(TypedDict):
