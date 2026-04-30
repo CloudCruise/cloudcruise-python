@@ -7,10 +7,21 @@ from .utils import encrypt_sensitive_fields, decrypt_sensitive_fields
 
 
 def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
-    """Convert a VaultEntryInput to a dict, dropping ``None`` values so we
-    don't send nulls the backend neither needs nor validates cleanly."""
+    """Convert a :class:`VaultEntryInput` to a request dict, dropping
+    ``None`` values so we don't send nulls the backend neither needs nor
+    validates cleanly.
+
+    ``asdict`` recurses into nested dataclasses, so we also strip ``None``
+    from the ``proxy`` sub-dict. We deliberately do NOT recurse into the
+    ``cookies`` / ``local_storage`` / ``session_storage`` blobs: those are
+    opaque user-supplied data and their ``None`` values may be meaningful.
+    """
     raw = asdict(entry)
-    return {k: v for k, v in raw.items() if v is not None}
+    payload: Dict[str, Any] = {k: v for k, v in raw.items() if v is not None}
+    proxy = payload.get("proxy")
+    if isinstance(proxy, dict):
+        payload["proxy"] = {k: v for k, v in proxy.items() if v is not None}
+    return payload
 
 
 class VaultClient:
