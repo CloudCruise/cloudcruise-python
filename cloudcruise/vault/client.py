@@ -1,8 +1,48 @@
 from __future__ import annotations
 
+from dataclasses import asdict, fields as _dc_fields
 from typing import Any, Dict, List, Optional
-from .types import VaultEntry, GetVaultEntriesFilters
-from .utils import encrypt_sensitive_fields, decrypt_sensitive_fields
+from .types import GetVaultEntriesFilters, ProxyConfig, VaultEntry, VaultEntryInput
+from .utils import decrypt_sensitive_fields, encrypt_sensitive_fields
+
+
+_VAULT_ENTRY_FIELDS = {f.name for f in _dc_fields(VaultEntry)}
+_PROXY_FIELDS = {f.name for f in _dc_fields(ProxyConfig)}
+
+
+def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
+    """Convert a :class:`VaultEntryInput` to a request dict, dropping
+    ``None`` values so we don't send nulls the backend neither needs nor
+    validates cleanly.
+
+    ``asdict`` recurses into nested dataclasses, so we also strip ``None``
+    from the ``proxy`` sub-dict. We deliberately do NOT recurse into the
+    ``cookies`` / ``local_storage`` / ``session_storage`` blobs: those are
+    opaque user-supplied data and their ``None`` values may be meaningful.
+    """
+    raw = asdict(entry)
+    payload: Dict[str, Any] = {k: v for k, v in raw.items() if v is not None}
+    proxy = payload.get("proxy")
+    if isinstance(proxy, dict):
+        payload["proxy"] = {k: v for k, v in proxy.items() if v is not None}
+    return payload
+
+
+def _to_vault_entry(data: Dict[str, Any]) -> VaultEntry:
+    """Build a :class:`VaultEntry` from a server response dict.
+
+    Drops unknown keys (forward-compat with new backend fields) and
+    reconstructs the nested :class:`ProxyConfig` if present. The backend
+    normally persists proxy as ``proxy_string``, so a nested proxy object
+    on the response is rare but handled defensively.
+    """
+    known: Dict[str, Any] = {k: v for k, v in data.items() if k in _VAULT_ENTRY_FIELDS}
+    proxy = known.get("proxy")
+    if isinstance(proxy, dict) and "enable" in proxy:
+        known["proxy"] = ProxyConfig(
+            **{k: v for k, v in proxy.items() if k in _PROXY_FIELDS}
+        )
+    return VaultEntry(**known)
 
 
 class VaultClient:
@@ -10,24 +50,19 @@ class VaultClient:
         self._make_request = make_request
         self._encryption_key = encryption_key
 
-    def create(
-        self,
-        domain: str,
-        permissioned_user_id: str,
-        options: Optional[Dict[str, Any]] = None,
-    ) -> VaultEntry:
-        entry: Dict[str, Any] = {
-            "domain": domain,
-            "permissioned_user_id": permissioned_user_id,
-        }
-        if options:
-            entry.update(options)
+    def create(self, entry: VaultEntryInput) -> VaultEntry:
+        """Create a vault entry.
 
-        processed = encrypt_sensitive_fields(entry, self._encryption_key)
+        Sensitive fields (``user_name``, ``password``, ``tfa_secret``) are
+        encrypted client-side before transport and decrypted on the response.
+        """
+        payload = _input_to_payload(entry)
+        processed = encrypt_sensitive_fields(payload, self._encryption_key)
         response = self._make_request("POST", "/vault", processed)
-        return decrypt_sensitive_fields(response, self._encryption_key)
+        decrypted = decrypt_sensitive_fields(response, self._encryption_key)
+        return _to_vault_entry(decrypted)
 
-    def get(self, filters: Optional[GetVaultEntriesFilters] = None):
+    def get(self, filters: Optional[GetVaultEntriesFilters] = None) -> List[VaultEntry]:
         path = "/vault"
         if filters and (filters.permissioned_user_id or filters.domain):
             from urllib.parse import urlencode
@@ -41,32 +76,27 @@ class VaultClient:
             path += f"?{qs}"
 
         response = self._make_request("GET", path)
-        entries = response if isinstance(response, list) else [response]
+        raw_entries = response if isinstance(response, list) else [response]
 
-        should_decrypt = True
-        if filters and filters.decryptCredentials is False:
-            should_decrypt = False
+        should_decrypt = not (filters and filters.decryptCredentials is False)
         if should_decrypt:
-            entries = [decrypt_sensitive_fields(e, self._encryption_key) for e in entries]
-        return entries
+            raw_entries = [
+                decrypt_sensitive_fields(e, self._encryption_key) for e in raw_entries
+            ]
+        return [_to_vault_entry(e) for e in raw_entries]
 
-    def update(self, updates: Dict[str, Any]) -> VaultEntry:
-        """
-        Updates an existing vault entry
-        Required fields: permissioned_user_id, user_name, password, domain
-        """
-        if not updates.get("permissioned_user_id"):
-            raise ValueError("permissioned_user_id is required for vault updates")
-        if not updates.get("user_name"):
-            raise ValueError("user_name is required for vault updates")
-        if not updates.get("password"):
-            raise ValueError("password is required for vault updates")
-        if not updates.get("domain"):
-            raise ValueError("domain is required for vault updates")
+    def update(self, entry: VaultEntryInput) -> VaultEntry:
+        """Update an existing vault entry.
 
-        processed = encrypt_sensitive_fields(dict(updates), self._encryption_key)
+        ``domain`` and ``permissioned_user_id`` identify the entry and are
+        required on :class:`VaultEntryInput`. Sensitive fields are re-encrypted
+        automatically.
+        """
+        payload = _input_to_payload(entry)
+        processed = encrypt_sensitive_fields(payload, self._encryption_key)
         response = self._make_request("PUT", "/vault", processed)
-        return decrypt_sensitive_fields(response, self._encryption_key)
+        decrypted = decrypt_sensitive_fields(response, self._encryption_key)
+        return _to_vault_entry(decrypted)
 
     def delete(self, params: Dict[str, str]) -> None:
         """

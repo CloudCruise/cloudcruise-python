@@ -119,7 +119,12 @@ class RunError:
     action_type: Optional[str] = None
     action_display_name: Optional[str] = None
     llm_error_category: Optional[str] = None
+    llm_error_sub_type: Optional[str] = None
+    llm_error_description: Optional[str] = None
     original_error: Optional[str] = None
+    node_id: Optional[str] = None
+    input_recovery: Optional[Any] = None
+    password_update_recovery: Optional[Any] = None
 
 
 @dataclass
