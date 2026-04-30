@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-from .types import VaultEntry, GetVaultEntriesFilters
+from dataclasses import asdict
+from typing import Any, Dict, Optional
+from .types import VaultEntry, VaultEntryInput, GetVaultEntriesFilters
 from .utils import encrypt_sensitive_fields, decrypt_sensitive_fields
+
+
+def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
+    """Convert a VaultEntryInput to a dict, dropping ``None`` values so we
+    don't send nulls the backend neither needs nor validates cleanly."""
+    raw = asdict(entry)
+    return {k: v for k, v in raw.items() if v is not None}
 
 
 class VaultClient:
@@ -10,20 +18,14 @@ class VaultClient:
         self._make_request = make_request
         self._encryption_key = encryption_key
 
-    def create(
-        self,
-        domain: str,
-        permissioned_user_id: str,
-        options: Optional[Dict[str, Any]] = None,
-    ) -> VaultEntry:
-        entry: Dict[str, Any] = {
-            "domain": domain,
-            "permissioned_user_id": permissioned_user_id,
-        }
-        if options:
-            entry.update(options)
+    def create(self, entry: VaultEntryInput) -> VaultEntry:
+        """Create a vault entry.
 
-        processed = encrypt_sensitive_fields(entry, self._encryption_key)
+        Sensitive fields (``user_name``, ``password``, ``tfa_secret``) are
+        encrypted client-side before transport and decrypted on the response.
+        """
+        payload = _input_to_payload(entry)
+        processed = encrypt_sensitive_fields(payload, self._encryption_key)
         response = self._make_request("POST", "/vault", processed)
         return decrypt_sensitive_fields(response, self._encryption_key)
 
@@ -50,21 +52,15 @@ class VaultClient:
             entries = [decrypt_sensitive_fields(e, self._encryption_key) for e in entries]
         return entries
 
-    def update(self, updates: Dict[str, Any]) -> VaultEntry:
-        """
-        Updates an existing vault entry
-        Required fields: permissioned_user_id, user_name, password, domain
-        """
-        if not updates.get("permissioned_user_id"):
-            raise ValueError("permissioned_user_id is required for vault updates")
-        if not updates.get("user_name"):
-            raise ValueError("user_name is required for vault updates")
-        if not updates.get("password"):
-            raise ValueError("password is required for vault updates")
-        if not updates.get("domain"):
-            raise ValueError("domain is required for vault updates")
+    def update(self, entry: VaultEntryInput) -> VaultEntry:
+        """Update an existing vault entry.
 
-        processed = encrypt_sensitive_fields(dict(updates), self._encryption_key)
+        ``domain`` and ``permissioned_user_id`` identify the entry and are
+        required on :class:`VaultEntryInput`. Sensitive fields are re-encrypted
+        automatically.
+        """
+        payload = _input_to_payload(entry)
+        processed = encrypt_sensitive_fields(payload, self._encryption_key)
         response = self._make_request("PUT", "/vault", processed)
         return decrypt_sensitive_fields(response, self._encryption_key)
 

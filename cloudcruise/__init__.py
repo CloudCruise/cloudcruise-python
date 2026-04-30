@@ -2,9 +2,10 @@ from .cloudcruise import CloudCruise, CloudCruiseParams
 
 from .vault.types import (
     VaultEntry,
+    VaultEntryInput,
     GetVaultEntriesFilters,
     ProxyConfig,
-    VaultPostPutHeadersInBody,
+    TfaMethod,
 )
 
 from .workflows.types import (
@@ -62,9 +63,10 @@ __all__ = [
     "client",
     # Vault Types
     "VaultEntry",
+    "VaultEntryInput",
     "GetVaultEntriesFilters",
     "ProxyConfig",
-    "VaultPostPutHeadersInBody",
+    "TfaMethod",
     # Workflow Types
     "Workflow",
     "WorkflowInputSchema",
