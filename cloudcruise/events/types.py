@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Generic, List, Literal, TypeVar, TypedDict, Union
+from typing import Any, Dict, Generic, List, Literal, TypeVar, Union
+
+from typing_extensions import TypedDict
 
 # Re-use EventType from runs.types to avoid circular imports
 # We'll import it later after updating runs/types.py
