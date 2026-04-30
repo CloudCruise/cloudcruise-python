@@ -12,7 +12,8 @@ authors = [{ name = "CloudCruise", email = "founders@cloudcruise.com" }]
 license = { text = "MIT License" }
 dependencies = [
   "requests>=2.31.0",
-  "cryptography>=41.0.0"
+  "cryptography>=41.0.0",
+  "typing_extensions>=4.0.0",
 ]
 keywords = ["cloudcruise", "sdk", "automation", "workflows", "sse", "webhook"]
 classifiers = [
