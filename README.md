@@ -54,7 +54,7 @@ run.on("end", lambda info: print(f"Run completed: {info['type']}"))
 
 # Block until the run finishes and fetch final results
 result = run.wait()
-print(result.status, result.data)
+print(result.get("status"), result.get("data"))
 ```
 
 Environment variables `CLOUDCRUISE_API_KEY`, `CLOUDCRUISE_ENCRYPTION_KEY` are also supported via lazy `cloudcruise.client()`.
