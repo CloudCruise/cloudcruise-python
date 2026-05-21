@@ -25,11 +25,13 @@ Python 3.10 or newer is required. The package ships with type hints (`py.typed`)
 ## Quick Start
 
 ```python
-from cloudcruise import CloudCruise, StartRunRequest
+from cloudcruise import CloudCruise, CloudCruiseParams, StartRunRequest
 
 client = CloudCruise(
-    api_key="<CLOUDCRUISE_API_KEY>",
-    encryption_key="<CLOUDCRUISE_ENCRYPTION_KEY>",
+    CloudCruiseParams(
+        api_key="<CLOUDCRUISE_API_KEY>",
+        encryption_key="<CLOUDCRUISE_ENCRYPTION_KEY>",
+    )
 )
 # Alternatively, set CLOUDCRUISE_API_KEY and CLOUDCRUISE_ENCRYPTION_KEY
 # environment variables and instantiate with `client = CloudCruise()`.
@@ -52,7 +54,7 @@ run.on("end", lambda info: print(f"Run completed: {info['type']}"))
 
 # Block until the run finishes and fetch final results
 result = run.wait()
-print(result.status, result.data)
+print(result.get("status"), result.get("data"))
 ```
 
 Environment variables `CLOUDCRUISE_API_KEY`, `CLOUDCRUISE_ENCRYPTION_KEY` are also supported via lazy `cloudcruise.client()`.
