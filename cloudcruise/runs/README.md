@@ -11,14 +11,16 @@ and manage workflow sessions directly from Python.
 ### Basic Workflow Execution
 
 ```python
-from cloudcruise import CloudCruise
+from cloudcruise import CloudCruise, CloudCruiseParams
 from cloudcruise.runs.types import StartRunRequest
 
 # Generate keys in the CloudCruise portal under Settings → API Keys and
 # Settings → Encryption Keys.
 client = CloudCruise(
-    api_key="your-api-key",
-    encryption_key="your-encryption-key",
+    CloudCruiseParams(
+        api_key="your-api-key",
+        encryption_key="your-encryption-key",
+    )
 )
 # Alternatively, set CLOUDCRUISE_API_KEY and CLOUDCRUISE_ENCRYPTION_KEY and
 # instantiate with `client = CloudCruise()`.

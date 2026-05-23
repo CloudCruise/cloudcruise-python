@@ -11,11 +11,13 @@ and prevent invalid submissions.
 ### Basic Operations
 
 ```python
-from cloudcruise import CloudCruise
+from cloudcruise import CloudCruise, CloudCruiseParams
 
 client = CloudCruise(
-    api_key="your-api-key",
-    encryption_key="your-encryption-key",
+    CloudCruiseParams(
+        api_key="your-api-key",
+        encryption_key="your-encryption-key",
+    )
 )
 # You can also set CLOUDCRUISE_API_KEY and CLOUDCRUISE_ENCRYPTION_KEY in the
 # environment and instantiate with `client = CloudCruise()`.

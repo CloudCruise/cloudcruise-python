@@ -54,7 +54,7 @@ run.on("end", lambda info: print(f"Run completed: {info['type']}"))
 
 # Block until the run finishes and fetch final results
 result = run.wait()
-print(result.get("status"), result.get("data"))
+print(result.status, result.data)
 ```
 
 Environment variables `CLOUDCRUISE_API_KEY`, `CLOUDCRUISE_ENCRYPTION_KEY` are also supported via lazy `cloudcruise.client()`.
@@ -91,7 +91,8 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 For live staging tests, export `CLOUDCRUISE_API_KEY` and
-`CLOUDCRUISE_ENCRYPTION_KEY`, then run `python -m unittest tests/test_live_staging.py -v`.
+`CLOUDCRUISE_ENCRYPTION_KEY`, then run
+`python -m unittest discover -s tests -p "test_live_staging.py" -v`.
 
 ---
 

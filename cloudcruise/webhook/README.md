@@ -131,7 +131,7 @@ execution.failed, execution.success.
 import hmac, hashlib, json
 body = {"event": "execution.success", "expires_at": 2000000000}
 body_str = json.dumps(body)
-signature = f"sha256={hmac.new(b"sekrit", body_str.encode(), hashlib.sha256).hexdigest()}"
+signature = f"sha256={hmac.new(b'sekrit', body_str.encode(), hashlib.sha256).hexdigest()}"
 ```
 
 Use `verify_signature(body_str.encode(), signature, "sekrit")` to validate.
