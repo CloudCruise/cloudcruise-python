@@ -22,11 +22,11 @@ client = CloudCruise(
 
 # Retrieve all workflows visible to the API key
 workflows = client.workflows.get_all_workflows()
-print(workflows)
+print(workflows[0].id)
 
 # Fetch metadata for a single workflow
 metadata = client.workflows.get_workflow_metadata("workflow-123")
-print(metadata)
+print(metadata.input_schema.required)
 ```
 
 ### Validating Workflow Input

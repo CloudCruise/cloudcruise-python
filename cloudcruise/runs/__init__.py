@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from .types import *  # re-export types for convenience
 
@@ -25,6 +25,7 @@ __all__ = [
     "RunResult",
     "WebhookEvent",
     "WebhookReplayResponse",
+    "FlattenedRunEvent",
     "RunHandle",
     "RunStreamOptions",
     "SseEventName",
@@ -40,7 +41,7 @@ __all__ = [
 ]
 
 
-def start(request: StartRunRequest, options: Optional[RunStreamOptions] = None) -> RunHandle:
+def start(request: StartRunRequest | Dict[str, Any], options: Optional[RunStreamOptions] = None) -> RunHandle:
     return _client().runs.start(request, options)
 
 

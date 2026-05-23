@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from .types import VaultEntry, VaultEntryInput, GetVaultEntriesFilters, ProxyConfig, TfaMethod
 
@@ -27,7 +27,7 @@ def create(entry: VaultEntryInput) -> VaultEntry:
     return _client().vault.create(entry)
 
 
-def get(filters: Optional[GetVaultEntriesFilters] = None):
+def get(filters: Optional[GetVaultEntriesFilters] = None) -> List[VaultEntry]:
     return _client().vault.get(filters)
 
 

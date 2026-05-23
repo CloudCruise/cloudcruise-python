@@ -44,13 +44,13 @@ run = client.runs.start(
 )
 
 # Listen to specific event types (recommended - clean and type-safe)
-run.on("execution.start", lambda e: print(f"Workflow started: {e['payload']['workflow_id']}"))
-run.on("execution.step", lambda e: print(f"Step: {e['payload']['current_step']}"))
-run.on("execution.success", lambda e: print(f"Success! Output: {e['payload'].get('data')}"))
+run.on("execution.start", lambda e: print(f"Workflow started: {e.payload['workflow_id']}"))
+run.on("execution.step", lambda e: print(f"Step: {e.payload['current_step']}"))
+run.on("execution.success", lambda e: print(f"Success! Output: {e.payload.get('data')}"))
 run.on("end", lambda info: print(f"Run completed: {info['type']}"))
 
 # Or use generic listener for all events (flattened structure)
-# run.on("run.event", lambda event: print(f"{event['type']}: {event['payload']}"))
+# run.on("run.event", lambda event: print(f"{event.type}: {event.payload}"))
 
 # Block until the run finishes and fetch final results
 result = run.wait()

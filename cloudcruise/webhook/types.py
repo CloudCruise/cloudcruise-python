@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 from ..runs.types import EventType
@@ -17,8 +17,7 @@ class VerificationError(Exception):
 class WebhookPayload:
     event: EventType | str
     expires_at: int
-    # Allow arbitrary extra fields
-    # mypy: ignore dynamic attributes
+    data: Dict[str, Any] = field(default_factory=dict)
 
 
 # Re-export WebhookMessage for convenience and type checking

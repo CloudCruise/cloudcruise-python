@@ -15,10 +15,12 @@ WEBHOOK_SECRET = "your-webhook-secret"
 # raw_body: the exact bytes received on the request
 # signature: the signature string from your webhook header (e.g., "sha256=<hex>")
 
-def verify(raw_body: bytes, signature: str) -> dict:
+def verify(raw_body: bytes, signature: str):
     try:
         payload = verify_signature(raw_body, signature, WEBHOOK_SECRET)
-        # payload is the parsed JSON dict; includes at least {"event", "expires_at", ...}
+        # payload is a WebhookPayload dataclass.
+        print("event:", payload.event)
+        print("extra fields:", payload.data)
         return payload
     except VerificationError as e:
         # e.statusCode is an int (e.g., 400 for expired/missing, 401 for invalid HMAC)
@@ -48,7 +50,7 @@ def cloudcruise_webhook():
     signature = request.headers.get("X-Signature", "")  # use your configured signature header
     try:
         payload = verify_signature(raw, signature, WEBHOOK_SECRET)
-        # handle event
+        # handle event via payload.event and payload.data
         return jsonify({"ok": True}), 200
     except VerificationError as e:
         return make_response(str(e), e.statusCode)
@@ -68,7 +70,7 @@ async def cloudcruise_webhook(request: Request):
     signature = request.headers.get("X-Signature", "")
     try:
         payload = verify_signature(raw, signature, WEBHOOK_SECRET)
-        return {"ok": True}
+        return {"ok": True, "event": payload.event}
     except VerificationError as e:
         return Response(content=str(e), status_code=e.statusCode)
 ```
@@ -110,12 +112,12 @@ The exception type is `VerificationError(message, statusCode)`.
 
 ## Event Payload
 Minimal shape:
-```json
-{
-  "event": "execution.success",
-  "expires_at": 1726350000,
-  "...": "additional fields"
-}
+```python
+WebhookPayload(
+    event="execution.success",
+    expires_at=1726350000,
+    data={"...": "additional fields"},
+)
 ```
 
 Common event types include: execution.queued, execution.start, execution.step,

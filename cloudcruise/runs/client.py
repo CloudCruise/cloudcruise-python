@@ -16,7 +16,10 @@ from .types import (
     RunStreamOptions,
     SseMessage,
     RunHandle,
+    FlattenedRunEvent,
+    RunEventEnvelope,
 )
+from ..utils.types import to_dataclass
 
 class RunsClient:
     def __init__(
@@ -29,14 +32,23 @@ class RunsClient:
         self._workflows = workflows
         self._connection_manager = connection_manager
 
-    def start(self, request: StartRunRequest, options: Optional[RunStreamOptions] = None) -> RunHandle:
+    def start(self, request: StartRunRequest | Dict[str, Any], options: Optional[RunStreamOptions] = None) -> RunHandle:
+        workflow_id = request.get("workflow_id") if isinstance(request, dict) else request.workflow_id
+        run_input_variables = (
+            request.get("run_input_variables")
+            if isinstance(request, dict)
+            else request.run_input_variables
+        )
         if self._workflows is not None:
             # Validate input variables proactively
-            self._workflows.validate_workflow_input(request.workflow_id, request.run_input_variables)
+            self._workflows.validate_workflow_input(workflow_id, run_input_variables)
 
         client_id = self._connection_manager.ensure_client_id()
         self._connection_manager.connect_if_needed()
-        request.client_id = client_id
+        if isinstance(request, dict):
+            request["client_id"] = client_id
+        else:
+            request.client_id = client_id
         from dataclasses import is_dataclass, asdict
         payload = asdict(request) if is_dataclass(request) else (
             dict(request) if isinstance(request, dict) else request.__dict__
@@ -65,7 +77,7 @@ class RunsClient:
         def is_terminal(status: Optional[str]) -> bool:
             return status in {"execution.success", "execution.failed", "execution.stopped"}
 
-        def flatten_event(msg: Dict[str, Any]) -> Dict[str, Any]:
+        def flatten_event(msg: RunEventEnvelope) -> FlattenedRunEvent:
             """
             Flatten the nested SSE event structure for better UX.
             Transforms:
@@ -77,23 +89,16 @@ class RunsClient:
                   'timestamp': ...
                 }
               }
-            Into:
-              {
-                'type': 'execution.start',
-                'payload': {...},
-                'timestamp': ...,
-                '_raw': {...}  # original message
-              }
+            Into a FlattenedRunEvent with attribute access.
             """
             data = msg.get("data", {})
-            flattened = {
-                "type": data.get("event"),
-                "payload": data.get("payload", {}),
-                "timestamp": data.get("timestamp"),
-                "expires_at": data.get("expires_at"),
-                "_raw": msg,
-            }
-            return flattened
+            return FlattenedRunEvent(
+                type=data.get("event") or "",
+                payload=data.get("payload", {}),
+                timestamp=data.get("timestamp"),
+                expires_at=data.get("expires_at"),
+                raw=msg,
+            )
 
         def emit(event: str, payload: Any | None = None) -> None:
             emitter.emit(event, payload)
@@ -130,7 +135,7 @@ class RunsClient:
 
                 # Flatten the event for better UX
                 flattened = flatten_event(m)
-                event_type = flattened.get("type")
+                event_type = flattened.type
 
                 # Push original message to stream for iteration
                 stream.push(m)  # type: ignore
@@ -247,7 +252,8 @@ class RunsClient:
 
     def get_results(self, session_id: str) -> RunResult:
         path = f"/run/{session_id}"
-        return self._make_request("GET", path)
+        response = self._make_request("GET", path)
+        return to_dataclass(response, RunResult)
 
     def interrupt(self, session_id: str) -> None:
         path = f"/run/{session_id}/interrupt"
@@ -255,4 +261,5 @@ class RunsClient:
 
     def replay_webhooks(self, session_id: str) -> WebhookReplayResponse:
         path = f"/webhooks/{session_id}/replay"
-        return self._make_request("POST", path)
+        response = self._make_request("POST", path)
+        return to_dataclass(response, WebhookReplayResponse)

@@ -54,5 +54,14 @@ def verify_message(
     if not (options and options.allowExpired) and (int(__import__('time').time()) > int(expires_at)):
         raise VerificationError("Webhook message expired", 400)
 
-    return data_json  # type: ignore
+    event = data_json.get("event")
+    if not event:
+        raise VerificationError("No event sent", 400)
+
+    extra = {
+        key: value
+        for key, value in data_json.items()
+        if key not in {"event", "expires_at"}
+    }
+    return WebhookPayload(event=event, expires_at=int(expires_at), data=extra)
 

@@ -18,8 +18,8 @@ class TestWebhook(unittest.TestCase):
         body_bytes = body_str.encode("utf-8")
         sig = _sign(body_str, "sekrit")
         verified = client.verify_signature(body_bytes, sig, "sekrit")
-        self.assertEqual(verified["event"], "execution.success")
-        self.assertEqual(verified["x"], 1)
+        self.assertEqual(verified.event, "execution.success")
+        self.assertEqual(verified.data["x"], 1)
 
     def test_verify_signature_expired_rejected(self):
         client = WebhookClient()
