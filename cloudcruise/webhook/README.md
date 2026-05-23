@@ -20,7 +20,8 @@ def verify(raw_body: bytes, signature: str):
         payload = verify_signature(raw_body, signature, WEBHOOK_SECRET)
         # payload is a WebhookPayload dataclass.
         print("event:", payload.event)
-        print("extra fields:", payload.data)
+        print("payload:", payload.payload)
+        print("metadata:", payload.metadata)
         return payload
     except VerificationError as e:
         # e.statusCode is an int (e.g., 400 for expired/missing, 401 for invalid HMAC)
@@ -50,7 +51,7 @@ def cloudcruise_webhook():
     signature = request.headers.get("X-Signature", "")  # use your configured signature header
     try:
         payload = verify_signature(raw, signature, WEBHOOK_SECRET)
-        # handle event via payload.event and payload.data
+        # handle event via payload.event, payload.payload, and payload.metadata
         return jsonify({"ok": True}), 200
     except VerificationError as e:
         return make_response(str(e), e.statusCode)
@@ -116,7 +117,9 @@ Minimal shape:
 WebhookPayload(
     event="execution.success",
     expires_at=1726350000,
-    data={"...": "additional fields"},
+    timestamp=1726349700,
+    payload={"...": "event-specific data"},
+    metadata={"...": "optional webhook metadata"},
 )
 ```
 
@@ -129,7 +132,12 @@ execution.failed, execution.success.
 ## Testing: Generating a Signature
 ```python
 import hmac, hashlib, json
-body = {"event": "execution.success", "expires_at": 2000000000}
+body = {
+    "event": "execution.success",
+    "expires_at": 2000000000,
+    "timestamp": 1999999700,
+    "payload": {"ok": True},
+}
 body_str = json.dumps(body)
 signature = f"sha256={hmac.new(b'sekrit', body_str.encode(), hashlib.sha256).hexdigest()}"
 ```

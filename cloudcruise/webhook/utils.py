@@ -57,11 +57,27 @@ def verify_message(
     event = data_json.get("event")
     if not event:
         raise VerificationError("No event sent", 400)
+    timestamp = data_json.get("timestamp")
+    if timestamp is None:
+        raise VerificationError("No timestamp sent", 400)
+    payload = data_json.get("payload")
+    if not isinstance(payload, dict):
+        raise VerificationError("No payload sent", 400)
+    metadata = data_json.get("metadata")
+    if metadata is not None and not isinstance(metadata, dict):
+        raise VerificationError("Metadata must be an object", 400)
 
     extra = {
         key: value
         for key, value in data_json.items()
-        if key not in {"event", "expires_at"}
+        if key not in {"event", "expires_at", "metadata", "payload", "timestamp"}
     }
-    return WebhookPayload(event=event, expires_at=int(expires_at), data=extra)
+    return WebhookPayload(
+        event=event,
+        expires_at=int(expires_at),
+        timestamp=int(timestamp),
+        payload=payload,
+        metadata=metadata,
+        data=extra,
+    )
 

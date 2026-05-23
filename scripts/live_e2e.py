@@ -116,6 +116,7 @@ def _check_webhook_dataclass() -> None:
         {
             "event": "execution.success",
             "expires_at": int(time.time()) + 60,
+            "timestamp": int(time.time()),
             "payload": {"ok": True},
         },
         separators=(",", ":"),
@@ -127,7 +128,7 @@ def _check_webhook_dataclass() -> None:
         f"verify_signature returned {type(verified).__name__}, expected WebhookPayload",
     )
     _assert(verified.event == "execution.success", "webhook event did not round-trip")
-    _assert(verified.data["payload"]["ok"] is True, "webhook extra payload missing")
+    _assert(verified.payload["ok"] is True, "webhook payload missing")
 
 
 def main() -> int:

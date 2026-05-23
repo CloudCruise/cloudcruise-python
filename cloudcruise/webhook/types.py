@@ -17,6 +17,9 @@ class VerificationError(Exception):
 class WebhookPayload:
     event: EventType | str
     expires_at: int
+    timestamp: int
+    payload: Dict[str, Any]
+    metadata: Optional[Dict[str, Any]] = None
     data: Dict[str, Any] = field(default_factory=dict)
 
 
