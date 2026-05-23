@@ -33,12 +33,22 @@ class RunsClient:
         self._connection_manager = connection_manager
 
     def start(self, request: StartRunRequest | Dict[str, Any], options: Optional[RunStreamOptions] = None) -> RunHandle:
-        workflow_id = request.get("workflow_id") if isinstance(request, dict) else request.workflow_id
-        run_input_variables = (
-            request.get("run_input_variables")
-            if isinstance(request, dict)
-            else request.run_input_variables
-        )
+        if isinstance(request, dict):
+            workflow_id = request.get("workflow_id")
+            if not workflow_id:
+                raise ValueError("workflow_id is required to start a run")
+            run_input_variables = request.get("run_input_variables") or {}
+            if not isinstance(run_input_variables, dict):
+                raise ValueError("run_input_variables must be a dict when provided")
+            request = {
+                **request,
+                "workflow_id": workflow_id,
+                "run_input_variables": run_input_variables,
+            }
+        else:
+            workflow_id = request.workflow_id
+            run_input_variables = request.run_input_variables or {}
+            request.run_input_variables = run_input_variables
         if self._workflows is not None:
             # Validate input variables proactively
             self._workflows.validate_workflow_input(workflow_id, run_input_variables)

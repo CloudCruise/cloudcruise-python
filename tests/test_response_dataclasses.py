@@ -11,7 +11,12 @@ from cloudcruise.runs.types import (
 )
 from cloudcruise.utils.events import SimpleEventEmitter
 from cloudcruise.workflows.client import WorkflowsClient
-from cloudcruise.workflows.types import Workflow, WorkflowMetadata, WorkflowInputSchema
+from cloudcruise.workflows.types import (
+    InputValidationError,
+    Workflow,
+    WorkflowInputSchema,
+    WorkflowMetadata,
+)
 
 
 class TestWorkflowDataclassResponses(unittest.TestCase):
@@ -100,6 +105,12 @@ class _FakeConnectionManager:
 
     def subscribe(self, session_id):
         return self.subscription
+
+
+class _RequiredInputWorkflows:
+    def validate_workflow_input(self, workflow_id, payload):
+        if "url" not in payload:
+            raise InputValidationError("missing required: url", ["url"])
 
 
 class TestRunDataclassResponses(unittest.TestCase):
@@ -195,6 +206,43 @@ class TestRunDataclassResponses(unittest.TestCase):
         self.assertEqual(events[0].timestamp, 1)
         self.assertEqual(events[0].expires_at, 2)
         self.assertEqual(events[0].raw["event"], "run.event")
+
+    def test_start_dict_without_inputs_normalizes_to_empty_dict_before_validation(self):
+        client = RunsClient(
+            _FakeConnectionManager(),
+            lambda *_: {"session_id": "session-1"},
+            _RequiredInputWorkflows(),
+        )
+
+        with self.assertRaises(InputValidationError) as ctx:
+            client.start({"workflow_id": "wf-1"})
+
+        self.assertEqual(ctx.exception.missingRequired, ["url"])
+
+    def test_start_dict_requires_workflow_id(self):
+        client = RunsClient(_FakeConnectionManager(), lambda *_: {"session_id": "session-1"})
+
+        with self.assertRaisesRegex(ValueError, "workflow_id is required"):
+            client.start({})
+
+    def test_start_dict_requires_dict_run_input_variables(self):
+        client = RunsClient(_FakeConnectionManager(), lambda *_: {"session_id": "session-1"})
+
+        with self.assertRaisesRegex(ValueError, "run_input_variables must be a dict"):
+            client.start({"workflow_id": "wf-1", "run_input_variables": ["not", "a", "dict"]})
+
+    def test_start_dict_sends_normalized_empty_inputs(self):
+        captured = {}
+
+        def make_request(method, path, body=None):
+            captured["body"] = body
+            return {"session_id": "session-1"}
+
+        client = RunsClient(_FakeConnectionManager(), make_request)
+
+        client.start({"workflow_id": "wf-1"})
+
+        self.assertEqual(captured["body"]["run_input_variables"], {})
 
 
 if __name__ == "__main__":
