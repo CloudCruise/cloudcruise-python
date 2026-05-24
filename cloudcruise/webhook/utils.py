@@ -60,9 +60,11 @@ def verify_message(
     timestamp = data_json.get("timestamp")
     if timestamp is None:
         raise VerificationError("No timestamp sent", 400)
+    if "payload" not in data_json:
+        raise VerificationError("No payload sent", 400)
     payload = data_json.get("payload")
     if not isinstance(payload, dict):
-        raise VerificationError("No payload sent", 400)
+        raise VerificationError("Payload must be an object", 400)
     metadata = data_json.get("metadata")
     if metadata is not None and not isinstance(metadata, dict):
         raise VerificationError("Metadata must be an object", 400)
