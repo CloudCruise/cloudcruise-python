@@ -11,22 +11,24 @@ and prevent invalid submissions.
 ### Basic Operations
 
 ```python
-from cloudcruise import CloudCruise
+from cloudcruise import CloudCruise, CloudCruiseParams
 
 client = CloudCruise(
-    api_key="your-api-key",
-    encryption_key="your-encryption-key",
+    CloudCruiseParams(
+        api_key="your-api-key",
+        encryption_key="your-encryption-key",
+    )
 )
 # You can also set CLOUDCRUISE_API_KEY and CLOUDCRUISE_ENCRYPTION_KEY in the
 # environment and instantiate with `client = CloudCruise()`.
 
 # Retrieve all workflows visible to the API key
 workflows = client.workflows.get_all_workflows()
-print(workflows)
+print(workflows[0].id)
 
 # Fetch metadata for a single workflow
 metadata = client.workflows.get_workflow_metadata("workflow-123")
-print(metadata)
+print(metadata.input_schema.required)
 ```
 
 ### Validating Workflow Input

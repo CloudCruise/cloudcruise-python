@@ -44,17 +44,17 @@ run = client.runs.start(
 )
 
 # Listen to specific event types (recommended - clean and type-safe)
-run.on("execution.start", lambda e: print(f"Workflow started: {e['payload']['workflow_id']}"))
-run.on("execution.step", lambda e: print(f"Step: {e['payload']['current_step']}"))
-run.on("execution.success", lambda e: print(f"Success! Output: {e['payload'].get('data')}"))
+run.on("execution.start", lambda e: print(f"Workflow started: {e.payload['workflow_id']}"))
+run.on("execution.step", lambda e: print(f"Step: {e.payload['current_step']}"))
+run.on("execution.success", lambda e: print(f"Success! Output: {e.payload.get('data')}"))
 run.on("end", lambda info: print(f"Run completed: {info['type']}"))
 
 # Or use generic listener for all events (flattened structure)
-# run.on("run.event", lambda event: print(f"{event['type']}: {event['payload']}"))
+# run.on("run.event", lambda event: print(f"{event.type}: {event.payload}"))
 
 # Block until the run finishes and fetch final results
 result = run.wait()
-print(result.get("status"), result.get("data"))
+print(result.status, result.data)
 ```
 
 Environment variables `CLOUDCRUISE_API_KEY`, `CLOUDCRUISE_ENCRYPTION_KEY` are also supported via lazy `cloudcruise.client()`.
@@ -91,7 +91,8 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 For live staging tests, export `CLOUDCRUISE_API_KEY` and
-`CLOUDCRUISE_ENCRYPTION_KEY`, then run `python -m unittest tests/test_live_staging.py -v`.
+`CLOUDCRUISE_ENCRYPTION_KEY`, then run
+`python -m unittest discover -s tests -p "test_live_staging.py" -v`.
 
 ---
 

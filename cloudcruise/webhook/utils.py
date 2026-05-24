@@ -54,5 +54,32 @@ def verify_message(
     if not (options and options.allowExpired) and (int(__import__('time').time()) > int(expires_at)):
         raise VerificationError("Webhook message expired", 400)
 
-    return data_json  # type: ignore
+    event = data_json.get("event")
+    if not event:
+        raise VerificationError("No event sent", 400)
+    timestamp = data_json.get("timestamp")
+    if timestamp is None:
+        raise VerificationError("No timestamp sent", 400)
+    if "payload" not in data_json:
+        raise VerificationError("No payload sent", 400)
+    payload = data_json.get("payload")
+    if not isinstance(payload, dict):
+        raise VerificationError("Payload must be an object", 400)
+    metadata = data_json.get("metadata")
+    if metadata is not None and not isinstance(metadata, dict):
+        raise VerificationError("Metadata must be an object", 400)
+
+    extra = {
+        key: value
+        for key, value in data_json.items()
+        if key not in {"event", "expires_at", "metadata", "payload", "timestamp"}
+    }
+    return WebhookPayload(
+        event=event,
+        expires_at=int(expires_at),
+        timestamp=int(timestamp),
+        payload=payload,
+        metadata=metadata,
+        data=extra,
+    )
 

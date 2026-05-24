@@ -47,7 +47,7 @@ class VaultEntryInput:
     persist_session_storage: Optional[bool] = None
     cookie_domain_to_store: Optional[str] = None
     skip_csrf_cookies: Optional[bool] = None
-    proxy: Optional[ProxyConfig] = None
+    proxy: Optional[ProxyConfig | dict[str, Any]] = None
     proxy_string: Optional[str] = None
     expiry_time_from_last_use: Optional[str] = None
     expiry_time_from_session_data_set: Optional[str] = None

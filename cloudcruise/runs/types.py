@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Iterator, List, Literal, Optional, Protocol, TypedDict, Union
 
 # Import event payload types for re-export
@@ -131,12 +131,13 @@ class RunError:
 class RunResult:
     session_id: str
     status: EventType
-    input_variables: Dict[str, Any]
-    data: Dict[str, Any]
-    video_urls: List[VideoUrl]
-    file_urls: List[FileUrl]
-    screenshot_urls: List[ScreenshotUrl]
-    errors: Optional[List[RunError]]
+    input_variables: Dict[str, Any] = field(default_factory=dict)
+    data: Dict[str, Any] = field(default_factory=dict)
+    video_urls: List[VideoUrl] = field(default_factory=list)
+    file_urls: List[FileUrl] = field(default_factory=list)
+    screenshot_urls: List[ScreenshotUrl] = field(default_factory=list)
+    errors: Optional[List[RunError]] = None
+    workflow_id: Optional[str] = None
 
 
 @dataclass
@@ -156,6 +157,15 @@ class WebhookReplayResponse:
 
 
 SseEventName = Literal["run.event", "ping"]
+
+
+@dataclass
+class FlattenedRunEvent:
+    type: EventType | str
+    payload: Dict[str, Any]
+    timestamp: Optional[int] = None
+    expires_at: Optional[int] = None
+    raw: Optional["RunEventEnvelope"] = None
 
 
 class RunEventData(TypedDict, total=False):
@@ -222,6 +232,7 @@ __all__ = [
     "RunResult",
     "WebhookEvent",
     "WebhookReplayResponse",
+    "FlattenedRunEvent",
     "SseEventName",
     "RunEventData",
     "RunEventEnvelope",

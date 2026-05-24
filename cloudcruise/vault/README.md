@@ -13,14 +13,17 @@ SDK transparently encrypts/decrypts sensitive fields.
 ```python
 from cloudcruise import (
     CloudCruise,
+    CloudCruiseParams,
     VaultEntryInput,
     GetVaultEntriesFilters,
     ProxyConfig,
 )
 
 client = CloudCruise(
-    api_key="your-api-key",
-    encryption_key="your-hex-encryption-key",  # required for vault ops
+    CloudCruiseParams(
+        api_key="your-api-key",
+        encryption_key="your-hex-encryption-key",  # required for vault ops
+    )
 )
 # Alternatively, export CLOUDCRUISE_API_KEY and CLOUDCRUISE_ENCRYPTION_KEY and
 # create the client with `client = CloudCruise()`.

@@ -10,17 +10,24 @@ from .types import (
     InputValidationError,
     InvalidTypeDetail,
 )
+from ..utils.types import to_dataclass
 
 class WorkflowsClient:
     def __init__(self, make_request) -> None:
         self._make_request = make_request
 
     def get_all_workflows(self) -> List[Workflow]:
-        return self._make_request("GET", "/workflows")
+        response = self._make_request("GET", "/workflows")
+        return [to_dataclass(item, Workflow) for item in response]
 
     def get_workflow_metadata(self, workflow_id: str) -> WorkflowMetadata:
         path = f"/workflows/{workflow_id}/metadata"
-        return self._make_request("GET", path)
+        response = self._make_request("GET", path)
+        if isinstance(response, dict) and "input_schema" not in response:
+            nested = response.get("metadata")
+            if isinstance(nested, dict) and "input_schema" in nested:
+                response = nested
+        return to_dataclass(response, WorkflowMetadata)
 
     def validate_workflow_input(self, workflow_id: str, payload: Dict[str, Any]) -> None:
         meta = self.get_workflow_metadata(workflow_id)
