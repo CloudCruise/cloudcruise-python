@@ -4,7 +4,6 @@
 ![PyPI - Version](https://img.shields.io/pypi/v/cloudcruise?style=flat-square)
 ![PyPI - Downloads](https://img.shields.io/pypi/dw/cloudcruise?style=flat-square)
 [![GitHub Repo stars](https://img.shields.io/github/stars/CloudCruise/cloudcruise-python?style=flat-square&logo=GitHub&label=cloudcruise-python)](https://github.com/CloudCruise/cloudcruise-python)
-[![Discord](https://img.shields.io/discord/1227480834945318933?style=flat-square&logo=Discord&logoColor=white&label=Discord&color=%23434EE4)](https://discord.com/invite/MHjbUqedZF)
 [![YC W24](https://img.shields.io/badge/Y%20Combinator-W24-orange?style=flat-square)](https://www.ycombinator.com/companies/cloudcruise)
 
 The official CloudCruise Python SDK for automated browser workflows, encrypted
@@ -100,7 +99,7 @@ For live staging tests, export `CLOUDCRUISE_API_KEY` and
 
 - [API Documentation](https://docs.cloudcruise.com) – Full platform reference
 - [CloudCruise Platform](https://cloudcruise.com) – Product overview
-- [Agents & Assistant Context](./AGENTS.md) – How this repository’s automation assistant operates
+- [Agents & Assistant Context](https://github.com/CloudCruise/cloudcruise-python/blob/main/AGENTS.md) – How this repository’s automation assistant operates
 
 ---
 
