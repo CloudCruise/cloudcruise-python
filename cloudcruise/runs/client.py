@@ -20,6 +20,16 @@ def _default_recovery_submit_error_log(operation: str, err: BaseException) -> No
     except Exception:
         pass
 
+
+def _verbose_log(operation: str, message: str) -> None:
+    """Helper for `verbose=True` mode on the recovery helpers. Writes a
+    structured line to stderr so customers can watch the recovery loop
+    end-to-end without instrumenting their own decider."""
+    try:
+        sys.stderr.write(f"[CloudCruise SDK verbose] {operation}: {message}\n")
+    except Exception:
+        pass
+
 from ..utils.async_queue import AsyncEventQueue
 from ..utils.events import SimpleEventEmitter
 from ..utils.connection_manager import ConnectionManager, SessionSubscription
@@ -330,6 +340,7 @@ class RunsClient:
         handle: RunHandle,
         decider: Callable[[Dict[str, Any]], str],
         on_error: Optional[Callable[[BaseException], None]] = None,
+        verbose: bool = False,
     ) -> Callable[[], None]:
         """
         Register a listener that auto-responds ONLY to non-dismissible modal
@@ -364,11 +375,10 @@ class RunsClient:
             client.runs.on_popup_decision_required(handle, decider)
             result = handle.wait()
         """
+        if verbose:
+            _verbose_log("on_popup_decision_required", "listener registered")
+
         def listener(event: Any) -> None:
-            # Read payload from the SSE envelope (which nests it under "data")
-            # OR from a flat dict (which the webhook delivery shape uses).
-            # Tolerate both so the helper works whether the customer wires it
-            # via handle.on (SSE) or via a manual webhook handler.
             if isinstance(event, dict):
                 data = event.get("data")
                 payload = (data or {}).get("payload") if isinstance(data, dict) else event.get("payload")
@@ -382,29 +392,51 @@ class RunsClient:
             if not isinstance(payload, dict):
                 return
             if payload.get("reason") != "non_dismissible_popup":
+                if verbose:
+                    _verbose_log(
+                        "on_popup_decision_required",
+                        f"skipping reason={payload.get('reason')!r}",
+                    )
                 return
             popup_ctx = payload.get("popup_context")
             if not isinstance(popup_ctx, dict):
                 return
 
-            # Decider failures are customer business-logic, not SDK errors —
-            # swallow so a buggy decider does not crash the event loop. The
-            # input wait will time out naturally and the run will fail.
+            if verbose:
+                attempt = (popup_ctx.get("retry") or {}).get("attempt")
+                actions = [a.get("id") for a in popup_ctx.get("available_actions", [])]
+                _verbose_log(
+                    "on_popup_decision_required",
+                    f"event received attempt={attempt} actions={actions}",
+                )
+
             try:
                 action_id = decider(popup_ctx)
-            except Exception:
+            except Exception as e:
+                if verbose:
+                    _verbose_log("on_popup_decision_required", f"decider raised: {e}")
                 return
             if not isinstance(action_id, str) or not action_id:
+                if verbose:
+                    _verbose_log(
+                        "on_popup_decision_required",
+                        f"decider returned non-string/empty ({action_id!r}); skipping",
+                    )
                 return
 
-            # Submission failures (invalid action_id, wait expired, backend
-            # 4xx/5xx). Greptile review v2: SimpleEventEmitter.emit swallows
-            # ALL handler exceptions, so simply propagating here vanishes the
-            # error in normal RunHandle dispatch. Route it through on_error
-            # (or the default stderr logger) so customers see it.
             session_id = payload.get("session_id") or handle.sessionId
+            if verbose:
+                _verbose_log(
+                    "on_popup_decision_required",
+                    f"submitting modal_action={action_id!r} for session={session_id}",
+                )
             try:
                 self.submit_modal_action(session_id, action_id)
+                if verbose:
+                    _verbose_log(
+                        "on_popup_decision_required",
+                        f"submit ok for action={action_id!r}",
+                    )
             except BaseException as e:
                 reporter = on_error or (
                     lambda err: _default_recovery_submit_error_log(
@@ -426,6 +458,7 @@ class RunsClient:
         handle: RunHandle,
         decider: Callable[[Dict[str, Any]], Dict[str, Any]],
         on_error: Optional[Callable[[BaseException], None]] = None,
+        verbose: bool = False,
     ) -> Callable[[], None]:
         """
         Register a listener that auto-responds ONLY to workflow-variable
@@ -462,6 +495,9 @@ class RunsClient:
         """
         VARIABLE_REASONS = {"input_required", "incorrect_form_input", "multiple_matching_results"}
 
+        if verbose:
+            _verbose_log("on_input_variables_required", "listener registered")
+
         def listener(event: Any) -> None:
             # Tolerate both SSE envelope (data.payload) and flat (payload).
             if isinstance(event, dict):
@@ -478,24 +514,45 @@ class RunsClient:
                 return
             reason = payload.get("reason")
             if reason not in VARIABLE_REASONS:
+                if verbose:
+                    _verbose_log(
+                        "on_input_variables_required",
+                        f"skipping reason={reason!r}",
+                    )
                 return
 
-            # Decider exceptions are customer logic — swallow.
+            if verbose:
+                _verbose_log(
+                    "on_input_variables_required",
+                    f"event received reason={reason!r}",
+                )
+
             try:
                 input_vars = decider(payload)
-            except Exception:
+            except Exception as e:
+                if verbose:
+                    _verbose_log(
+                        "on_input_variables_required", f"decider raised: {e}"
+                    )
                 return
-            # Reject non-dict and list (which is also `object` in JS-land;
-            # Python "isinstance(list, dict)" is already false, but explicit
-            # for clarity and to mirror the JS-side guard).
             if not isinstance(input_vars, dict) or isinstance(input_vars, list):
+                if verbose:
+                    _verbose_log(
+                        "on_input_variables_required",
+                        f"decider returned non-dict ({type(input_vars).__name__}); skipping",
+                    )
                 return
 
-            # Submission failures. Greptile v2: SimpleEventEmitter swallows
-            # handler exceptions, so route via on_error / stderr default.
             session_id = payload.get("session_id") or handle.sessionId
+            if verbose:
+                _verbose_log(
+                    "on_input_variables_required",
+                    f"submitting input_variables keys={list(input_vars.keys())} for session={session_id}",
+                )
             try:
                 self.submit_input_variables(session_id, input_vars)
+                if verbose:
+                    _verbose_log("on_input_variables_required", "submit ok")
             except BaseException as e:
                 reporter = on_error or (
                     lambda err: _default_recovery_submit_error_log(

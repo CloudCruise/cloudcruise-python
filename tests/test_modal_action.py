@@ -768,3 +768,56 @@ def test_variables_helper_reads_sse_envelope_data_payload_shape():
     )
     assert client._make_request.call_count == 1  # type: ignore[attr-defined]
     assert client._make_request.call_args[0][2] == {"input_variables": {"MEMBER_ID": "X"}}  # type: ignore[attr-defined]
+
+
+def test_verbose_mode_logs_lifecycle_to_stderr(capsys):
+    """verbose=True writes structured lines to stderr at each lifecycle step."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-vb"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    client.on_popup_decision_required(FakeHandle(), lambda ctx: "yes", verbose=True)
+    listeners["execution.input_required"](
+        {"payload": {
+            "session_id": "sess-vb", "reason": "non_dismissible_popup",
+            "popup_context": {
+                "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                "available_actions": [{"id": "yes", "label": "Yes"}, {"id": "no", "label": "No"}],
+                "retry": {"attempt": 2, "max_attempts": 3}}}}
+    )
+
+    err = capsys.readouterr().err
+    assert "listener registered" in err
+    assert "attempt=2" in err
+    assert "actions=['yes', 'no']" in err
+    assert "submitting modal_action='yes'" in err
+    assert "submit ok" in err
+
+
+def test_verbose_mode_off_by_default(capsys):
+    """Without verbose, no [verbose] lines are printed."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-q"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    client.on_popup_decision_required(FakeHandle(), lambda ctx: "yes")
+    listeners["execution.input_required"](
+        {"payload": {
+            "session_id": "sess-q", "reason": "non_dismissible_popup",
+            "popup_context": {
+                "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                "available_actions": [{"id": "yes", "label": "Yes"}],
+                "retry": {"attempt": 1, "max_attempts": 3}}}}
+    )
+    err = capsys.readouterr().err
+    assert "[CloudCruise SDK verbose]" not in err
