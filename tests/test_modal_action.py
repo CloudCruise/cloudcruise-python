@@ -358,3 +358,200 @@ def test_retry_attempt_visible_to_decider():
     calls = client._make_request.call_args_list  # type: ignore[attr-defined]
     assert calls[0][0][2] == {"modal_action": "yes"}
     assert calls[1][0][2] == {"modal_action": "no"}
+
+
+# === Gap coverage: edge cases on payload shape ===
+
+def test_popup_listener_handles_missing_popup_context():
+    """If reason=non_dismissible_popup but popup_context is absent, skip without raising."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-g"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    decider_calls = []
+    client.on_popup_decision_required(FakeHandle(), lambda ctx: (decider_calls.append(ctx), "yes")[1])
+
+    # Missing popup_context entirely
+    listeners["execution.input_required"]({"payload": {"session_id": "sess-g", "reason": "non_dismissible_popup"}})
+    # popup_context is None
+    listeners["execution.input_required"]({"payload": {"session_id": "sess-g", "reason": "non_dismissible_popup", "popup_context": None}})
+    # popup_context is empty dict
+    listeners["execution.input_required"]({"payload": {"session_id": "sess-g", "reason": "non_dismissible_popup", "popup_context": {}}})
+
+    # popup_context: {} actually fires the decider because the listener only checks isinstance(dict)
+    # The decider would then receive {} and need to handle empty actions. Our decider returns "yes" naively;
+    # the submission goes through. This documents current behavior.
+    assert len(decider_calls) == 1  # only the {} case calls the decider
+    # Empty popup_context: decider returned "yes", submission attempted
+    assert client._make_request.call_count == 1  # type: ignore[attr-defined]
+
+
+def test_popup_listener_skips_when_decider_returns_empty_or_none():
+    """Decider returning '' or None or non-string -> listener skips submission."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-e"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    deciders_returns = ["", None, 42, [], {"id": "yes"}]
+    idx = [0]
+    def decider(ctx):
+        v = deciders_returns[idx[0]]
+        idx[0] += 1
+        return v
+
+    client.on_popup_decision_required(FakeHandle(), decider)
+
+    def fire():
+        listeners["execution.input_required"](
+            {"payload": {
+                "session_id": "sess-e", "reason": "non_dismissible_popup",
+                "popup_context": {
+                    "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                    "available_actions": [{"id": "yes", "label": "Yes"}],
+                    "retry": {"attempt": 1, "max_attempts": 3}}}}
+        )
+
+    for _ in deciders_returns:
+        fire()
+
+    # None of the non-string returns should result in a POST
+    assert client._make_request.call_count == 0  # type: ignore[attr-defined]
+
+
+def test_variables_listener_skips_when_decider_returns_non_dict():
+    """Decider returning non-dict for input_variables -> skip submission."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-v2"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    bad_returns = [None, "string", 42, []]
+    idx = [0]
+    def decider(payload):
+        v = bad_returns[idx[0]]
+        idx[0] += 1
+        return v
+
+    client.on_input_variables_required(FakeHandle(), decider)
+
+    for _ in bad_returns:
+        listeners["execution.input_required"](
+            {"payload": {"session_id": "sess-v2", "reason": "incorrect_form_input", "input_variables": {}}}
+        )
+
+    assert client._make_request.call_count == 0  # type: ignore[attr-defined]
+
+
+def test_listener_handles_payload_that_is_not_a_dict():
+    """Listener handles None / list / scalar payloads without raising."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-n"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    client.on_popup_decision_required(FakeHandle(), lambda ctx: "yes")
+
+    # Payload as None
+    listeners["execution.input_required"]({"payload": None})
+    # Payload missing entirely
+    listeners["execution.input_required"]({})
+    # Event is None
+    listeners["execution.input_required"](None)
+    # Event is a list
+    listeners["execution.input_required"]([1, 2, 3])
+
+    assert client._make_request.call_count == 0  # type: ignore[attr-defined]
+
+
+def test_unsubscribe_stops_listener_firing():
+    """Calling the returned unsubscribe must prevent further submissions."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+    removed = [False]
+
+    class FakeHandle:
+        sessionId = "sess-u"
+        def on(self, event, handler):
+            listeners[event] = handler
+            def _off():
+                removed[0] = True
+                # Real implementations would also detach; simulate by clearing
+                listeners.pop(event, None)
+            return _off
+
+    unsubscribe = client.on_popup_decision_required(FakeHandle(), lambda ctx: "yes")
+
+    # Fire once before unsubscribe
+    listeners["execution.input_required"](
+        {"payload": {
+            "session_id": "sess-u", "reason": "non_dismissible_popup",
+            "popup_context": {
+                "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                "available_actions": [{"id": "yes", "label": "Yes"}],
+                "retry": {"attempt": 1, "max_attempts": 3}}}}
+    )
+    assert client._make_request.call_count == 1  # type: ignore[attr-defined]
+
+    # Unsubscribe and verify listener was removed
+    unsubscribe()
+    assert removed[0] is True
+    assert "execution.input_required" not in listeners
+
+
+def test_concurrent_multiple_modals_in_same_session():
+    """Multiple input_required events in a row should each get processed independently."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-multi"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    call_log = []
+    def decider(ctx):
+        choice = ctx["available_actions"][0]["id"]
+        call_log.append(choice)
+        return choice
+
+    client.on_popup_decision_required(FakeHandle(), decider)
+
+    # Fire 3 different modals back-to-back (simulating multi-step chain)
+    modals = [
+        ([{"id": "proceed", "label": "Proceed"}], 1),
+        ([{"id": "yes", "label": "Yes"}], 1),
+        ([{"id": "acknowledge", "label": "Acknowledge"}], 1),
+    ]
+    for actions, attempt in modals:
+        listeners["execution.input_required"](
+            {"payload": {
+                "session_id": "sess-multi", "reason": "non_dismissible_popup",
+                "popup_context": {
+                    "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                    "available_actions": actions,
+                    "retry": {"attempt": attempt, "max_attempts": 3}}}}
+        )
+
+    assert call_log == ["proceed", "yes", "acknowledge"]
+    assert client._make_request.call_count == 3  # type: ignore[attr-defined]
+    submitted = [c[0][2]["modal_action"] for c in client._make_request.call_args_list]  # type: ignore[attr-defined]
+    assert submitted == ["proceed", "yes", "acknowledge"]
