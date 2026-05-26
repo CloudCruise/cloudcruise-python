@@ -559,9 +559,11 @@ def test_concurrent_multiple_modals_in_same_session():
 
 # === Greptile P1 fixes: submit errors propagate; both event shapes accepted ===
 
-def test_submit_errors_propagate_from_popup_helper():
-    """Greptile P1: submit_modal_action errors must NOT be swallowed; only
-    decider exceptions are."""
+def test_submit_errors_surface_via_on_error_callback_popup_helper():
+    """Greptile review v2: SimpleEventEmitter.emit swallows handler exceptions,
+    so submit errors must be routed via on_error (or default stderr logger)
+    rather than just re-raised. With on_error set, the customer receives the
+    exception; the listener does NOT re-raise into the emitter."""
     client = make_client()
     client._make_request = MagicMock(side_effect=RuntimeError("backend 400: wait expired"))  # type: ignore[attr-defined]
     listeners: Dict[str, Any] = {}
@@ -572,21 +574,85 @@ def test_submit_errors_propagate_from_popup_helper():
             listeners[event] = handler
             return lambda: None
 
+    captured: List[BaseException] = []
+    client.on_popup_decision_required(
+        FakeHandle(),
+        lambda ctx: "yes",
+        on_error=lambda e: captured.append(e),
+    )
+
+    # Listener must not raise — the emitter would swallow it. Instead the
+    # error reaches the on_error callback.
+    listeners["execution.input_required"](
+        {"payload": {
+            "session_id": "sess-p", "reason": "non_dismissible_popup",
+            "popup_context": {
+                "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                "available_actions": [{"id": "yes", "label": "Yes"}],
+                "retry": {"attempt": 1, "max_attempts": 3}}}}
+    )
+    assert len(captured) == 1
+    assert isinstance(captured[0], RuntimeError)
+    assert "wait expired" in str(captured[0])
+
+
+def test_submit_errors_default_to_stderr_when_on_error_unset_popup_helper(capsys):
+    """Without on_error, the default reporter writes to stderr so the failure
+    is at least visible in logs."""
+    client = make_client()
+    client._make_request = MagicMock(side_effect=RuntimeError("backend 400"))  # type: ignore[attr-defined]
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-p"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
     client.on_popup_decision_required(FakeHandle(), lambda ctx: "yes")
+    listeners["execution.input_required"](
+        {"payload": {
+            "session_id": "sess-p", "reason": "non_dismissible_popup",
+            "popup_context": {
+                "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                "available_actions": [{"id": "yes", "label": "Yes"}],
+                "retry": {"attempt": 1, "max_attempts": 3}}}}
+    )
+    err = capsys.readouterr().err
+    assert "CloudCruise SDK" in err
+    assert "submit_modal_action" in err
+    assert "backend 400" in err
 
-    with pytest.raises(RuntimeError, match="wait expired"):
-        listeners["execution.input_required"](
-            {"payload": {
-                "session_id": "sess-p", "reason": "non_dismissible_popup",
-                "popup_context": {
-                    "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
-                    "available_actions": [{"id": "yes", "label": "Yes"}],
-                    "retry": {"attempt": 1, "max_attempts": 3}}}}
-        )
+
+def test_submit_errors_surface_via_on_error_callback_variables_helper():
+    """Variables helper mirrors the popup helper: submit failures route to
+    on_error rather than being re-raised into the swallowing emitter."""
+    client = make_client()
+    client._make_request = MagicMock(side_effect=RuntimeError("backend 500"))  # type: ignore[attr-defined]
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-v"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    captured: List[BaseException] = []
+    client.on_input_variables_required(
+        FakeHandle(),
+        lambda payload: {"X": 1},
+        on_error=lambda e: captured.append(e),
+    )
+
+    listeners["execution.input_required"](
+        {"payload": {"session_id": "sess-v", "reason": "incorrect_form_input", "input_variables": {}}}
+    )
+    assert len(captured) == 1
+    assert "backend 500" in str(captured[0])
 
 
-def test_submit_errors_propagate_from_variables_helper():
-    """Greptile P1: submit_input_variables errors must NOT be swallowed."""
+def test_submit_errors_default_to_stderr_variables_helper(capsys):
+    """Variables helper's default reporter also writes to stderr."""
     client = make_client()
     client._make_request = MagicMock(side_effect=RuntimeError("backend 500"))  # type: ignore[attr-defined]
     listeners: Dict[str, Any] = {}
@@ -598,11 +664,42 @@ def test_submit_errors_propagate_from_variables_helper():
             return lambda: None
 
     client.on_input_variables_required(FakeHandle(), lambda payload: {"X": 1})
+    listeners["execution.input_required"](
+        {"payload": {"session_id": "sess-v", "reason": "incorrect_form_input", "input_variables": {}}}
+    )
+    err = capsys.readouterr().err
+    assert "submit_input_variables" in err
+    assert "backend 500" in err
 
-    with pytest.raises(RuntimeError, match="backend 500"):
-        listeners["execution.input_required"](
-            {"payload": {"session_id": "sess-v", "reason": "incorrect_form_input", "input_variables": {}}}
-        )
+
+def test_on_error_callback_exceptions_dont_crash_emitter():
+    """If the on_error callback itself raises, the listener still must not
+    propagate into the emitter (which would swallow it anyway; this guards
+    against a buggy on_error tripping up SDK state)."""
+    client = make_client()
+    client._make_request = MagicMock(side_effect=RuntimeError("submit boom"))  # type: ignore[attr-defined]
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-e"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    def bad_on_error(e):
+        raise ValueError("on_error also broke")
+
+    client.on_popup_decision_required(FakeHandle(), lambda ctx: "yes", on_error=bad_on_error)
+
+    # Should not raise.
+    listeners["execution.input_required"](
+        {"payload": {
+            "session_id": "sess-e", "reason": "non_dismissible_popup",
+            "popup_context": {
+                "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                "available_actions": [{"id": "yes", "label": "Yes"}],
+                "retry": {"attempt": 1, "max_attempts": 3}}}}
+    )
 
 
 def test_popup_helper_reads_sse_envelope_data_payload_shape():

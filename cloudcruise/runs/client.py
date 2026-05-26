@@ -2,7 +2,23 @@ from __future__ import annotations
 
 import threading
 import time
+import sys
 from typing import Any, Callable, Dict, Iterator, Optional
+
+
+def _default_recovery_submit_error_log(operation: str, err: BaseException) -> None:
+    """Default error reporter for the recovery helpers. Writes to stderr so
+    submission failures surface in customer logs even if no on_error callback
+    is provided. The runtime SimpleEventEmitter swallows all handler
+    exceptions, so without this default a 4xx/5xx from /new_input_variables
+    would vanish into the void."""
+    try:
+        sys.stderr.write(
+            f"[CloudCruise SDK] {operation} failed during recovery: "
+            f"{type(err).__name__}: {err}\n"
+        )
+    except Exception:
+        pass
 
 from ..utils.async_queue import AsyncEventQueue
 from ..utils.events import SimpleEventEmitter
@@ -313,6 +329,7 @@ class RunsClient:
         self,
         handle: RunHandle,
         decider: Callable[[Dict[str, Any]], str],
+        on_error: Optional[Callable[[BaseException], None]] = None,
     ) -> Callable[[], None]:
         """
         Register a listener that auto-responds ONLY to non-dismissible modal
@@ -381,11 +398,23 @@ class RunsClient:
                 return
 
             # Submission failures (invalid action_id, wait expired, backend
-            # 4xx/5xx) are NOT swallowed — they propagate so the customer can
-            # observe and react. Per Greptile P1 review: swallowing here
-            # makes "registered but ineffective" the silent failure mode.
+            # 4xx/5xx). Greptile review v2: SimpleEventEmitter.emit swallows
+            # ALL handler exceptions, so simply propagating here vanishes the
+            # error in normal RunHandle dispatch. Route it through on_error
+            # (or the default stderr logger) so customers see it.
             session_id = payload.get("session_id") or handle.sessionId
-            self.submit_modal_action(session_id, action_id)
+            try:
+                self.submit_modal_action(session_id, action_id)
+            except BaseException as e:
+                reporter = on_error or (
+                    lambda err: _default_recovery_submit_error_log(
+                        "submit_modal_action", err
+                    )
+                )
+                try:
+                    reporter(e)
+                except Exception:
+                    pass
 
         unsubscribe = handle.on("execution.input_required", listener)
         if callable(unsubscribe):
@@ -396,6 +425,7 @@ class RunsClient:
         self,
         handle: RunHandle,
         decider: Callable[[Dict[str, Any]], Dict[str, Any]],
+        on_error: Optional[Callable[[BaseException], None]] = None,
     ) -> Callable[[], None]:
         """
         Register a listener that auto-responds ONLY to workflow-variable
@@ -461,9 +491,21 @@ class RunsClient:
             if not isinstance(input_vars, dict) or isinstance(input_vars, list):
                 return
 
-            # Submission failures propagate (Greptile P1).
+            # Submission failures. Greptile v2: SimpleEventEmitter swallows
+            # handler exceptions, so route via on_error / stderr default.
             session_id = payload.get("session_id") or handle.sessionId
-            self.submit_input_variables(session_id, input_vars)
+            try:
+                self.submit_input_variables(session_id, input_vars)
+            except BaseException as e:
+                reporter = on_error or (
+                    lambda err: _default_recovery_submit_error_log(
+                        "submit_input_variables", err
+                    )
+                )
+                try:
+                    reporter(e)
+                except Exception:
+                    pass
 
         unsubscribe = handle.on("execution.input_required", listener)
         if callable(unsubscribe):
