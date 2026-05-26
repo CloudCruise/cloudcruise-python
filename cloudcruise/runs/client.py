@@ -348,22 +348,44 @@ class RunsClient:
             result = handle.wait()
         """
         def listener(event: Any) -> None:
+            # Read payload from the SSE envelope (which nests it under "data")
+            # OR from a flat dict (which the webhook delivery shape uses).
+            # Tolerate both so the helper works whether the customer wires it
+            # via handle.on (SSE) or via a manual webhook handler.
+            if isinstance(event, dict):
+                data = event.get("data")
+                payload = (data or {}).get("payload") if isinstance(data, dict) else event.get("payload")
+            else:
+                data = getattr(event, "data", None)
+                payload = (
+                    getattr(data, "payload", None)
+                    if data is not None
+                    else getattr(event, "payload", None)
+                )
+            if not isinstance(payload, dict):
+                return
+            if payload.get("reason") != "non_dismissible_popup":
+                return
+            popup_ctx = payload.get("popup_context")
+            if not isinstance(popup_ctx, dict):
+                return
+
+            # Decider failures are customer business-logic, not SDK errors —
+            # swallow so a buggy decider does not crash the event loop. The
+            # input wait will time out naturally and the run will fail.
             try:
-                payload = event.get("payload") if isinstance(event, dict) else getattr(event, "payload", None)
-                if not isinstance(payload, dict):
-                    return
-                if payload.get("reason") != "non_dismissible_popup":
-                    return
-                popup_ctx = payload.get("popup_context")
-                if not isinstance(popup_ctx, dict):
-                    return
                 action_id = decider(popup_ctx)
-                if not isinstance(action_id, str) or not action_id:
-                    return
-                session_id = payload.get("session_id") or handle.sessionId
-                self.submit_modal_action(session_id, action_id)
             except Exception:
                 return
+            if not isinstance(action_id, str) or not action_id:
+                return
+
+            # Submission failures (invalid action_id, wait expired, backend
+            # 4xx/5xx) are NOT swallowed — they propagate so the customer can
+            # observe and react. Per Greptile P1 review: swallowing here
+            # makes "registered but ineffective" the silent failure mode.
+            session_id = payload.get("session_id") or handle.sessionId
+            self.submit_modal_action(session_id, action_id)
 
         unsubscribe = handle.on("execution.input_required", listener)
         if callable(unsubscribe):
@@ -411,20 +433,37 @@ class RunsClient:
         VARIABLE_REASONS = {"input_required", "incorrect_form_input", "multiple_matching_results"}
 
         def listener(event: Any) -> None:
+            # Tolerate both SSE envelope (data.payload) and flat (payload).
+            if isinstance(event, dict):
+                data = event.get("data")
+                payload = (data or {}).get("payload") if isinstance(data, dict) else event.get("payload")
+            else:
+                data = getattr(event, "data", None)
+                payload = (
+                    getattr(data, "payload", None)
+                    if data is not None
+                    else getattr(event, "payload", None)
+                )
+            if not isinstance(payload, dict):
+                return
+            reason = payload.get("reason")
+            if reason not in VARIABLE_REASONS:
+                return
+
+            # Decider exceptions are customer logic — swallow.
             try:
-                payload = event.get("payload") if isinstance(event, dict) else getattr(event, "payload", None)
-                if not isinstance(payload, dict):
-                    return
-                reason = payload.get("reason")
-                if reason not in VARIABLE_REASONS:
-                    return
                 input_vars = decider(payload)
-                if not isinstance(input_vars, dict):
-                    return
-                session_id = payload.get("session_id") or handle.sessionId
-                self.submit_input_variables(session_id, input_vars)
             except Exception:
                 return
+            # Reject non-dict and list (which is also `object` in JS-land;
+            # Python "isinstance(list, dict)" is already false, but explicit
+            # for clarity and to mirror the JS-side guard).
+            if not isinstance(input_vars, dict) or isinstance(input_vars, list):
+                return
+
+            # Submission failures propagate (Greptile P1).
+            session_id = payload.get("session_id") or handle.sessionId
+            self.submit_input_variables(session_id, input_vars)
 
         unsubscribe = handle.on("execution.input_required", listener)
         if callable(unsubscribe):

@@ -555,3 +555,119 @@ def test_concurrent_multiple_modals_in_same_session():
     assert client._make_request.call_count == 3  # type: ignore[attr-defined]
     submitted = [c[0][2]["modal_action"] for c in client._make_request.call_args_list]  # type: ignore[attr-defined]
     assert submitted == ["proceed", "yes", "acknowledge"]
+
+
+# === Greptile P1 fixes: submit errors propagate; both event shapes accepted ===
+
+def test_submit_errors_propagate_from_popup_helper():
+    """Greptile P1: submit_modal_action errors must NOT be swallowed; only
+    decider exceptions are."""
+    client = make_client()
+    client._make_request = MagicMock(side_effect=RuntimeError("backend 400: wait expired"))  # type: ignore[attr-defined]
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-p"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    client.on_popup_decision_required(FakeHandle(), lambda ctx: "yes")
+
+    with pytest.raises(RuntimeError, match="wait expired"):
+        listeners["execution.input_required"](
+            {"payload": {
+                "session_id": "sess-p", "reason": "non_dismissible_popup",
+                "popup_context": {
+                    "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                    "available_actions": [{"id": "yes", "label": "Yes"}],
+                    "retry": {"attempt": 1, "max_attempts": 3}}}}
+        )
+
+
+def test_submit_errors_propagate_from_variables_helper():
+    """Greptile P1: submit_input_variables errors must NOT be swallowed."""
+    client = make_client()
+    client._make_request = MagicMock(side_effect=RuntimeError("backend 500"))  # type: ignore[attr-defined]
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-v"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    client.on_input_variables_required(FakeHandle(), lambda payload: {"X": 1})
+
+    with pytest.raises(RuntimeError, match="backend 500"):
+        listeners["execution.input_required"](
+            {"payload": {"session_id": "sess-v", "reason": "incorrect_form_input", "input_variables": {}}}
+        )
+
+
+def test_popup_helper_reads_sse_envelope_data_payload_shape():
+    """Greptile concern: real SSE delivery nests payload under event.data.payload.
+    The listener must accept that shape, not only the flat {payload: ...} shape."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-sse"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    client.on_popup_decision_required(FakeHandle(), lambda ctx: "yes")
+
+    # Real SSE envelope: { event, data: { event, payload, timestamp, expires_at } }
+    listeners["execution.input_required"](
+        {
+            "event": "execution.input_required",
+            "data": {
+                "event": "execution.input_required",
+                "payload": {
+                    "session_id": "sess-sse",
+                    "reason": "non_dismissible_popup",
+                    "popup_context": {
+                        "error_description": "x", "error_sub_type": "NON_DISMISSIBLE", "full_url": "x",
+                        "available_actions": [{"id": "yes", "label": "Yes"}],
+                        "retry": {"attempt": 1, "max_attempts": 3},
+                    },
+                },
+                "timestamp": 1, "expires_at": 2,
+            },
+        }
+    )
+    assert client._make_request.call_count == 1  # type: ignore[attr-defined]
+    assert client._make_request.call_args[0][2] == {"modal_action": "yes"}  # type: ignore[attr-defined]
+
+
+def test_variables_helper_reads_sse_envelope_data_payload_shape():
+    """Mirror of the popup-helper test for the variables helper."""
+    client = make_client()
+    listeners: Dict[str, Any] = {}
+
+    class FakeHandle:
+        sessionId = "sess-sse2"
+        def on(self, event, handler):
+            listeners[event] = handler
+            return lambda: None
+
+    client.on_input_variables_required(FakeHandle(), lambda payload: {"MEMBER_ID": "X"})
+
+    listeners["execution.input_required"](
+        {
+            "event": "execution.input_required",
+            "data": {
+                "event": "execution.input_required",
+                "payload": {
+                    "session_id": "sess-sse2",
+                    "reason": "input_required",
+                    "input_variables": {},
+                },
+                "timestamp": 1, "expires_at": 2,
+            },
+        }
+    )
+    assert client._make_request.call_count == 1  # type: ignore[attr-defined]
+    assert client._make_request.call_args[0][2] == {"input_variables": {"MEMBER_ID": "X"}}  # type: ignore[attr-defined]
