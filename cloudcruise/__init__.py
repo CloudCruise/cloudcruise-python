@@ -54,6 +54,14 @@ from .runs.types import (
     RunEventMessage,
 )
 
+# Modal recovery types (execution.input_required + non_dismissible_popup)
+from .events.types import (
+    AvailableAction,
+    PopupRetry,
+    PopupContext,
+    ExecutionInputRequiredPayload,
+)
+
 from .webhook.types import WebhookPayload, WebhookVerificationOptions, VerificationError, WebhookMessage
 from ._default import get_client as client
 
@@ -110,6 +118,11 @@ __all__ = [
     "ScreenshotUploadedPayload",
     "EventWebhookMessage",
     "RunEventMessage",
+    # Modal Recovery Types
+    "AvailableAction",
+    "PopupRetry",
+    "PopupContext",
+    "ExecutionInputRequiredPayload",
     # Webhook Types
     "WebhookPayload",
     "WebhookVerificationOptions",

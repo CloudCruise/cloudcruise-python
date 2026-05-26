@@ -35,6 +35,10 @@ __all__ = [
     "start",
     "subscribe_to_session",
     "submit_user_interaction",
+    "submit_modal_action",
+    "submit_input_variables",
+    "on_popup_decision_required",
+    "on_input_variables_required",
     "get_results",
     "interrupt",
     "replay_webhooks",
@@ -51,6 +55,22 @@ def subscribe_to_session(session_id: str, options: Optional[RunStreamOptions] = 
 
 def submit_user_interaction(session_id: str, data: UserInteractionData) -> None:
     return _client().runs.submit_user_interaction(session_id, data)
+
+
+def submit_modal_action(session_id: str, action_id: str) -> None:
+    return _client().runs.submit_modal_action(session_id, action_id)
+
+
+def submit_input_variables(session_id: str, input_variables: Dict[str, Any]) -> None:
+    return _client().runs.submit_input_variables(session_id, input_variables)
+
+
+def on_popup_decision_required(handle: RunHandle, decider):
+    return _client().runs.on_popup_decision_required(handle, decider)
+
+
+def on_input_variables_required(handle: RunHandle, decider):
+    return _client().runs.on_input_variables_required(handle, decider)
 
 
 def get_results(session_id: str) -> RunResult:
