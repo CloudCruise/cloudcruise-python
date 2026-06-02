@@ -142,6 +142,11 @@ class TestVaultProxyFields(unittest.TestCase):
         encrypted = encrypt_sensitive_fields(payload, self.KEY)
         self.assertEqual(encrypted["proxy_value"], "US")
 
+    def test_proxy_value_without_proxy_setting_raises(self):
+        payload = {"proxy_value": "socks5://user:pass@proxy.example.com:1080"}
+        with self.assertRaises(ValueError):
+            encrypt_sensitive_fields(payload, self.KEY)
+
 
 if __name__ == "__main__":
     unittest.main()
