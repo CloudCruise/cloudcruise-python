@@ -2,12 +2,19 @@ from __future__ import annotations
 
 from dataclasses import asdict, fields as _dc_fields
 from typing import Any, Dict, List, Optional
-from .types import GetVaultEntriesFilters, ProxyConfig, VaultEntry, VaultEntryInput
+from .types import (
+    GetVaultEntriesFilters,
+    ProxyConfig,
+    VaultEntry,
+    VaultEntryInput,
+    VaultTfaCode,
+)
 from .utils import decrypt_sensitive_fields, encrypt_sensitive_fields
 
 
 _VAULT_ENTRY_FIELDS = {f.name for f in _dc_fields(VaultEntry)}
 _PROXY_FIELDS = {f.name for f in _dc_fields(ProxyConfig)}
+_TFA_CODE_FIELDS = {f.name for f in _dc_fields(VaultTfaCode)}
 
 
 def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
@@ -108,3 +115,28 @@ class VaultClient:
         if not params.get("permissioned_user_id"):
             raise ValueError("permissioned_user_id is required to delete a vault entry")
         self._make_request("DELETE", "/vault", params)
+
+    def get_tfa_code(self, permissioned_user_id: str, domain: str) -> VaultTfaCode:
+        """Get the current 2FA code for a single vault entry.
+
+        The code is auto-detected by the credential's 2FA method:
+        - authenticator: a freshly generated TOTP, with ``expires_in_seconds``.
+        - email: the most recently received code (within the freshness window),
+          with ``received_at``.
+
+        SMS and magic-link credentials are not supported (the endpoint returns
+        409). The code is returned with ``Cache-Control: no-store`` and should
+        not be logged or cached.
+        """
+        if not permissioned_user_id:
+            raise ValueError("permissioned_user_id is required to get a TFA code")
+        if not domain:
+            raise ValueError("domain is required to get a TFA code")
+        from urllib.parse import urlencode
+
+        qs = urlencode(
+            {"permissioned_user_id": permissioned_user_id, "domain": domain}
+        )
+        response = self._make_request("GET", f"/vault/tfa-code?{qs}")
+        known = {k: v for k, v in response.items() if k in _TFA_CODE_FIELDS}
+        return VaultTfaCode(**known)

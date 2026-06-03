@@ -80,6 +80,12 @@ client.vault.delete(
         "domain": "https://example.com",
     }
 )
+
+# Get the current 2FA code for an entry (auto-detected by the credential's 2FA method)
+tfa = client.vault.get_tfa_code("user123", "https://example.com")
+# authenticator -> VaultTfaCode(type="authenticator", code="123456", expires_in_seconds=23)
+# email         -> VaultTfaCode(type="email", code="884512", received_at="...")
+# (SMS and magic-link credentials are not supported.)
 ```
 
 ### Advanced Configuration

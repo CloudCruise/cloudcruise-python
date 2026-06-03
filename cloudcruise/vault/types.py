@@ -108,3 +108,17 @@ class GetVaultEntriesFilters:
     permissioned_user_id: Optional[str] = None
     domain: Optional[str] = None
     decryptCredentials: Optional[bool] = None
+
+
+@dataclass
+class VaultTfaCode:
+    """The current 2FA code for a vault entry.
+
+    ``expires_in_seconds`` is set for authenticator (TOTP) codes; ``received_at``
+    is set for email codes.
+    """
+
+    type: str  # "authenticator" | "email"
+    code: str
+    expires_in_seconds: Optional[int] = None
+    received_at: Optional[str] = None
