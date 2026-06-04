@@ -108,3 +108,28 @@ class GetVaultEntriesFilters:
     permissioned_user_id: Optional[str] = None
     domain: Optional[str] = None
     decryptCredentials: Optional[bool] = None
+
+
+@dataclass
+class VaultTfaCode:
+    """The current 2FA code for a vault entry.
+
+    ``expires_in_seconds`` is set for authenticator (TOTP) codes; ``received_at``
+    is set for email codes.
+    """
+
+    type: str  # "authenticator" | "email"
+    code: str
+    expires_in_seconds: Optional[int] = None
+    received_at: Optional[str] = None
+
+    def __repr__(self) -> str:
+        # Redact the code so debug/log output of the object never leaks a live
+        # OTP. The value is still accessible via the ``code`` attribute.
+        return (
+            "VaultTfaCode("
+            f"type={self.type!r}, "
+            "code='<redacted>', "
+            f"expires_in_seconds={self.expires_in_seconds!r}, "
+            f"received_at={self.received_at!r})"
+        )

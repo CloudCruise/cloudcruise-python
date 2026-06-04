@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from .types import VaultEntry, VaultEntryInput, GetVaultEntriesFilters, ProxyConfig, TfaMethod
+from .types import (
+    VaultEntry,
+    VaultEntryInput,
+    GetVaultEntriesFilters,
+    ProxyConfig,
+    TfaMethod,
+    VaultTfaCode,
+)
 
 def _client():
     # Lazy import to avoid circular imports during package initialization
@@ -15,11 +22,13 @@ __all__ = [
     "GetVaultEntriesFilters",
     "ProxyConfig",
     "TfaMethod",
+    "VaultTfaCode",
     # Convenience APIs
     "create",
     "get",
     "update",
     "delete",
+    "get_tfa_code",
 ]
 
 
@@ -37,3 +46,7 @@ def update(entry: VaultEntryInput) -> VaultEntry:
 
 def delete(params: Dict[str, str]) -> None:
     return _client().vault.delete(params)
+
+
+def get_tfa_code(permissioned_user_id: str, domain: str) -> VaultTfaCode:
+    return _client().vault.get_tfa_code(permissioned_user_id, domain)

@@ -6,6 +6,7 @@ from .vault.types import (
     GetVaultEntriesFilters,
     ProxyConfig,
     TfaMethod,
+    VaultTfaCode,
 )
 
 from .workflows.types import (
@@ -68,6 +69,7 @@ __all__ = [
     "GetVaultEntriesFilters",
     "ProxyConfig",
     "TfaMethod",
+    "VaultTfaCode",
     # Workflow Types
     "Workflow",
     "WorkflowInputSchema",
