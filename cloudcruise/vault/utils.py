@@ -55,6 +55,18 @@ def encrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict
         encrypted["password"] = encrypt_data(entry["password"], encryption_key)
     if entry.get("tfa_secret") is not None:
         encrypted["tfa_secret"] = encrypt_data(entry["tfa_secret"], encryption_key)
+    # proxy_value is meaningless to the backend without proxy_setting, which is
+    # also the discriminator that decides whether to encrypt. Fail closed so a
+    # custom proxy URL (often with embedded credentials) is never sent in
+    # plaintext because the caller omitted the mode on a partial update.
+    if entry.get("proxy_value") is not None and not entry.get("proxy_setting"):
+        raise ValueError(
+            "proxy_value requires proxy_setting. Pass proxy_setting='custom' for a "
+            "bring-your-own proxy URL (so it is encrypted before sending), or "
+            "'static'/'country' for a managed proxy."
+        )
+    if entry.get("proxy_setting") == "custom" and entry.get("proxy_value") is not None:
+        encrypted["proxy_value"] = encrypt_data(entry["proxy_value"], encryption_key)
     return encrypted
 
 
@@ -78,4 +90,11 @@ def decrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict
             decrypted["tfa_secret"] = decrypt_data(val, encryption_key)
         except Exception:
             pass
+    if entry.get("proxy_setting") == "custom":
+        val = entry.get("proxy_value")
+        if isinstance(val, str):
+            try:
+                decrypted["proxy_value"] = decrypt_data(val, encryption_key)
+            except Exception:
+                pass
     return decrypted

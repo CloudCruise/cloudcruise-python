@@ -2,6 +2,10 @@ import unittest
 
 from cloudcruise import ProxyConfig, VaultEntry, VaultEntryInput
 from cloudcruise.vault.client import _input_to_payload, _to_vault_entry
+from cloudcruise.vault.utils import (
+    decrypt_sensitive_fields,
+    encrypt_sensitive_fields,
+)
 
 
 class TestVaultInputToPayload(unittest.TestCase):
@@ -107,6 +111,41 @@ class TestToVaultEntry(unittest.TestCase):
         }
         entry = _to_vault_entry(response)
         self.assertIsInstance(entry.proxy, dict)
+
+
+class TestVaultProxyFields(unittest.TestCase):
+    KEY = "a" * 64  # 32-byte hex key
+
+    def test_input_passes_proxy_setting_and_value_through(self):
+        entry = VaultEntryInput(
+            domain="https://example.com",
+            permissioned_user_id="u1",
+            proxy_setting="custom",
+            proxy_value="socks5://user:pass@proxy.example.com:1080",
+        )
+        payload = _input_to_payload(entry)
+        self.assertEqual(payload["proxy_setting"], "custom")
+        self.assertEqual(
+            payload["proxy_value"], "socks5://user:pass@proxy.example.com:1080"
+        )
+
+    def test_custom_proxy_value_is_encrypted_and_decrypted(self):
+        url = "socks5://user:pass@proxy.example.com:1080"
+        payload = {"proxy_setting": "custom", "proxy_value": url}
+        encrypted = encrypt_sensitive_fields(payload, self.KEY)
+        self.assertNotEqual(encrypted["proxy_value"], url)
+        decrypted = decrypt_sensitive_fields(encrypted, self.KEY)
+        self.assertEqual(decrypted["proxy_value"], url)
+
+    def test_non_custom_proxy_value_left_plaintext(self):
+        payload = {"proxy_setting": "country", "proxy_value": "US"}
+        encrypted = encrypt_sensitive_fields(payload, self.KEY)
+        self.assertEqual(encrypted["proxy_value"], "US")
+
+    def test_proxy_value_without_proxy_setting_raises(self):
+        payload = {"proxy_value": "socks5://user:pass@proxy.example.com:1080"}
+        with self.assertRaises(ValueError):
+            encrypt_sensitive_fields(payload, self.KEY)
 
 
 if __name__ == "__main__":

@@ -49,6 +49,8 @@ class VaultEntryInput:
     skip_csrf_cookies: Optional[bool] = None
     proxy: Optional[ProxyConfig | dict[str, Any]] = None
     proxy_string: Optional[str] = None
+    proxy_setting: Optional[Literal["random", "static", "country", "custom"]] = None
+    proxy_value: Optional[str] = None
     expiry_time_from_last_use: Optional[str] = None
     expiry_time_from_session_data_set: Optional[str] = None
 
@@ -96,6 +98,8 @@ class VaultEntry:
     skip_csrf_cookies: Optional[bool] = None
     proxy: Optional[ProxyConfig] = None
     proxy_string: Optional[str] = None
+    proxy_setting: Optional[Literal["random", "static", "country", "custom"]] = None
+    proxy_value: Optional[str] = None
     expiry_time_from_last_use: Optional[str] = None
     expiry_time_from_session_data_set: Optional[str] = None
     session_data_set_at: Optional[str] = None
