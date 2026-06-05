@@ -38,6 +38,7 @@ dev = [
   "python-dotenv>=1.0.0",
   "build>=1.0.0",
   "twine>=4.0.0",
+  "pytest>=8.0.0",
 ]
 
 [tool.setuptools.package-data]
