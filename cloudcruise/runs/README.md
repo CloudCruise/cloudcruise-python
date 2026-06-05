@@ -121,6 +121,61 @@ def maybe_submit_input(event):
 handle.on("run.event", maybe_submit_input)
 ```
 
+### Input-Required Recoveries
+
+When the worker can't proceed and needs human/business input, the backend emits an `execution.input_required` event with a `reason` discriminator. The SDK exposes two logical handler shapes, one per recovery family. Underneath, both route from the same event; the SDK partitions by `reason` so your code stays clean.
+
+| `reason` | Recovery shape | SDK handler | Decider returns |
+|---|---|---|---|
+| `non_dismissible_popup` | Modal blocks click; pick one CTA button | `on_popup_decision_required` | `str` (action_id) |
+| `input_required` | Workflow needs a missing variable | `on_input_variables_required` | `dict[str, Any]` (input_variables) |
+| `incorrect_form_input` | Form rejected the typed value | `on_input_variables_required` | `dict[str, Any]` |
+| `multiple_matching_results` | Extractor needs disambiguation | `on_input_variables_required` | `dict[str, Any]` |
+
+The SDK never picks a value on its own. The decision is always yours: "Proceed" vs "Cancel" on a duplicate-patient prompt is business-specific, just like the right member ID lookup.
+
+**Non-dismissible modal (popup decision required)**
+
+```python
+def decider(ctx):
+    # ctx is the popup_context dict. ctx["retry"]["attempt"] lets you branch
+    # your choice between the first try and a retry (e.g., switch from Yes
+    # to Cancel if the modal re-appeared after the first dispatch).
+    if "duplicate" in ctx["error_description"].lower():
+        return next(a["id"] for a in ctx["available_actions"]
+                    if "proceed" in a["label"].lower())
+    return ctx["available_actions"][0]["id"]
+
+handle = client.runs.start(StartRunRequest(workflow_id="...", run_input_variables={}))
+client.runs.on_popup_decision_required(handle, decider)
+result = handle.wait()
+```
+
+**Workflow variable (input_required / incorrect_form_input / multiple_matching_results)**
+
+```python
+def decider(payload):
+    # payload is the full input_required event payload (includes reason)
+    if payload["reason"] == "incorrect_form_input":
+        return {"USERNAME": prompt_operator_for_username()}
+    if payload["reason"] == "input_required":
+        return {"MEMBER_ID": lookup_member_id_from_billing_db()}
+    return {}  # multiple_matching_results: pick the right disambiguator
+
+client.runs.on_input_variables_required(handle, decider)
+```
+
+**Both handlers compose** — register both on the same handle if your workflow can hit either recovery family.
+
+**Low-level escape hatches** if you want full control:
+- `client.runs.submit_modal_action(session_id, action_id)`
+- `client.runs.submit_input_variables(session_id, dict)`
+- `handle.on("execution.input_required", listener)` for raw event access.
+
+Tips:
+- Customer-side wait budget = workspace setting `input_required_timeout_seconds` (default 15s, clamp 5-300s). Bump it if your operators or automation need more time.
+- For multi-step modal chains (modal A → dismiss → modal B → dismiss), `on_popup_decision_required` is invoked once per modal automatically. The attempt counter resets after each verified dismissal.
+
 ### Advanced Options
 
 ```python
