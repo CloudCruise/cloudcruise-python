@@ -58,6 +58,64 @@ class TestVaultInputToPayload(unittest.TestCase):
         payload = _input_to_payload(entry)
         self.assertEqual(payload["cookies"], cookies)
 
+    def test_provider_backed_fields_pass_through(self):
+        entry = VaultEntryInput(
+            domain="https://example.com",
+            permissioned_user_id="u1",
+            secret_provider_id="provider-1",
+            secret_ref="op://vault/item",
+            secret_cache_ttl_seconds=300,
+        )
+        payload = _input_to_payload(entry)
+        self.assertEqual(
+            payload,
+            {
+                "domain": "https://example.com",
+                "permissioned_user_id": "u1",
+                "secret_provider_id": "provider-1",
+                "secret_ref": "op://vault/item",
+                "secret_cache_ttl_seconds": 300,
+            },
+        )
+
+    def test_provider_backed_fields_require_id_and_ref_together(self):
+        entry = VaultEntryInput(
+            domain="https://example.com",
+            permissioned_user_id="u1",
+            secret_provider_id="provider-1",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "secret_provider_id and secret_ref must be provided together"
+        ):
+            _input_to_payload(entry)
+
+    def test_provider_backed_fields_reject_direct_secrets(self):
+        entry = VaultEntryInput(
+            domain="https://example.com",
+            permissioned_user_id="u1",
+            user_name="alice",
+            secret_provider_id="provider-1",
+            secret_ref="op://vault/item",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "provider-backed vault entries cannot include user_name"
+        ):
+            _input_to_payload(entry)
+
+    def test_provider_cache_ttl_requires_provider(self):
+        entry = VaultEntryInput(
+            domain="https://example.com",
+            permissioned_user_id="u1",
+            secret_cache_ttl_seconds=300,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "secret_cache_ttl_seconds requires secret_provider_id"
+        ):
+            _input_to_payload(entry)
+
 
 class TestToVaultEntry(unittest.TestCase):
     def test_builds_vault_entry_with_attribute_access(self):
@@ -77,6 +135,19 @@ class TestToVaultEntry(unittest.TestCase):
         self.assertEqual(entry.domain, "https://example.com")
         self.assertEqual(entry.user_name, "alice")
         self.assertEqual(entry.tfa_method, "AUTHENTICATOR")
+
+    def test_builds_provider_backed_vault_entry(self):
+        response = {
+            "domain": "https://example.com",
+            "permissioned_user_id": "u1",
+            "secret_provider_id": "provider-1",
+            "secret_ref": "op://vault/item",
+            "secret_cache_ttl_seconds": 300,
+        }
+        entry = _to_vault_entry(response)
+        self.assertEqual(entry.secret_provider_id, "provider-1")
+        self.assertEqual(entry.secret_ref, "op://vault/item")
+        self.assertEqual(entry.secret_cache_ttl_seconds, 300)
 
     def test_drops_unknown_fields(self):
         """Forward-compat: if the backend adds new columns, we don't blow up."""

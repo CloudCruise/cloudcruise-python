@@ -32,7 +32,33 @@ def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
     proxy = payload.get("proxy")
     if isinstance(proxy, dict):
         payload["proxy"] = {k: v for k, v in proxy.items() if v is not None}
+    _validate_provider_payload(payload)
     return payload
+
+
+def _validate_provider_payload(payload: Dict[str, Any]) -> None:
+    has_provider_id = "secret_provider_id" in payload
+    has_secret_ref = "secret_ref" in payload
+    if has_provider_id != has_secret_ref:
+        raise ValueError("secret_provider_id and secret_ref must be provided together")
+
+    if "secret_cache_ttl_seconds" in payload:
+        ttl = payload["secret_cache_ttl_seconds"]
+        if not isinstance(ttl, int) or ttl < 0:
+            raise ValueError("secret_cache_ttl_seconds must be a non-negative integer")
+        if not has_provider_id:
+            raise ValueError(
+                "secret_cache_ttl_seconds requires secret_provider_id and secret_ref"
+            )
+
+    if has_provider_id:
+        direct_secret_fields = ("user_name", "password", "tfa_secret")
+        conflicts = [field for field in direct_secret_fields if field in payload]
+        if conflicts:
+            raise ValueError(
+                "provider-backed vault entries cannot include "
+                + ", ".join(conflicts)
+            )
 
 
 def _to_vault_entry(data: Dict[str, Any]) -> VaultEntry:

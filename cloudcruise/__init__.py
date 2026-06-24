@@ -9,6 +9,12 @@ from .vault.types import (
     VaultTfaCode,
 )
 
+from .secret_providers.types import (
+    SecretProvider,
+    SecretProviderItem,
+    SecretProviderType,
+)
+
 from .workflows.types import (
     Workflow,
     WorkflowInputSchema,
@@ -78,6 +84,10 @@ __all__ = [
     "ProxyConfig",
     "TfaMethod",
     "VaultTfaCode",
+    # Secret Provider Types
+    "SecretProvider",
+    "SecretProviderItem",
+    "SecretProviderType",
     # Workflow Types
     "Workflow",
     "WorkflowInputSchema",
