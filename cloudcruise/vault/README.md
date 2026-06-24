@@ -88,6 +88,26 @@ tfa = client.vault.get_tfa_code("user123", "https://example.com")
 # (SMS and magic-link credentials are not supported.)
 ```
 
+### Provider-Backed Credentials
+
+Use `secret_providers` to find a connected 1Password account and item ref, then
+bind a vault entry to that item instead of sending `user_name` / `password`.
+
+```python
+providers = client.secret_providers.list()
+items = client.secret_providers.list_items(providers[0].id)
+
+entry = client.vault.create(
+    VaultEntryInput(
+        domain="https://example.com",
+        permissioned_user_id="user123",
+        secret_provider_id=providers[0].id,
+        secret_ref=items[0].ref,
+        secret_cache_ttl_seconds=300,
+    )
+)
+```
+
 ### Advanced Configuration
 
 ```python

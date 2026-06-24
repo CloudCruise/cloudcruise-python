@@ -29,6 +29,9 @@ class VaultEntryInput:
     user_id: Optional[str] = None
     user_name: Optional[str] = None
     password: Optional[str] = None
+    secret_provider_id: Optional[str] = None
+    secret_ref: Optional[str] = None
+    secret_cache_ttl_seconds: Optional[int] = None
     tfa_secret: Optional[str] = None
     tfa_method: Optional[TfaMethod] = None
     user_agent: Optional[str] = None
@@ -76,6 +79,9 @@ class VaultEntry:
     user_id: Optional[str] = None
     user_name: Optional[str] = None
     password: Optional[str] = None
+    secret_provider_id: Optional[str] = None
+    secret_ref: Optional[str] = None
+    secret_cache_ttl_seconds: Optional[int] = None
     tfa_secret: Optional[str] = None
     tfa_method: Optional[TfaMethod] = None
     tfa_email: Optional[str] = None

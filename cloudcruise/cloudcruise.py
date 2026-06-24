@@ -7,6 +7,7 @@ import requests
 
 from .utils.env import get_env
 from .vault.client import VaultClient
+from .secret_providers.client import SecretProvidersClient
 from .workflows.client import WorkflowsClient
 from .runs.client import RunsClient
 from .webhook.client import WebhookClient
@@ -27,6 +28,7 @@ class CloudCruise:
 
     # Expose typed attributes for IDE autocomplete
     vault: VaultClient
+    secret_providers: SecretProvidersClient
     workflows: WorkflowsClient
     runs: RunsClient
     webhook: WebhookClient
@@ -51,6 +53,7 @@ class CloudCruise:
         # Initialize namespace clients
         self._connection_manager = ConnectionManager(self._base_url, self._api_key)
         self.vault = VaultClient(self._make_request, self._encryption_key)
+        self.secret_providers = SecretProvidersClient(self._make_request)
         self.workflows = WorkflowsClient(self._make_request)
         self.runs = RunsClient(self._connection_manager, self._make_request, self.workflows)
         self.webhook = WebhookClient()
