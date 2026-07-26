@@ -210,6 +210,16 @@ webhook_handle = client.runs.start(
 - `client.runs.get_results(session_id)` – Retrieve the latest run snapshot.
 - `client.runs.interrupt(session_id)` – Request that the workflow stop.
 - `client.runs.replay_webhooks(session_id)` – Re-send run-specific webhooks.
+- `client.runs.get_live_view_connection(session_id)` – Fetch a fresh live-view URL + auth token for watching an active session's browser stream.
+
+#### Watching a Live Session
+
+```python
+connection = client.runs.get_live_view_connection(run.sessionId)
+print("Watch live:", connection.url)
+```
+
+The `auth_token` embedded in `connection.url` is **single-use** — once the viewer link has been opened, opening it again (reloading the tab, or reopening it later) will fail to connect. Call `get_live_view_connection` again to mint a fresh token/link instead of reusing the old one. This only succeeds while the session is still active; it raises once the session has ended.
 
 Each `RunHandle` also exposes:
 

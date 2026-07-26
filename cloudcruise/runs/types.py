@@ -83,6 +83,15 @@ UserInteractionData = Dict[str, Any]
 
 
 @dataclass
+class LiveViewConnection:
+    """Response from GET /live/sessions/:session_id/connection."""
+
+    url: str
+    session_id: str
+    auth_token: str
+
+
+@dataclass
 class VideoUrl:
     timestamp: str
     session_id: str
@@ -226,6 +235,7 @@ __all__ = [
     "StartRunRequest",
     "StartRunResponse",
     "UserInteractionData",
+    "LiveViewConnection",
     "VideoUrl",
     "FileUrl",
     "ScreenshotUrl",
