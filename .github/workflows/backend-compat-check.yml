@@ -1,0 +1,39 @@
+name: Backend Compatibility Check
+
+# Verifies the current SDK still works against a real, running CloudCruise
+# backend, catching contract drift that mocked unit tests can't. Unlike the
+# JS SDK, this one has no baseUrl allowlist to work around — but base_url is
+# still a closed choice list, not free text, so a dispatcher can't turn this
+# into a way to send CLOUDCRUISE_API_KEY to an arbitrary host.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Backend URL to test against"
+        required: true
+        type: choice
+        options:
+          - https://staging-api.cloudcruise.app
+        default: https://staging-api.cloudcruise.app
+
+permissions:
+  contents: read
+
+jobs:
+  compat-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - run: pip install .
+
+      - name: Run compatibility smoke test
+        run: python scripts/compat_smoke.py
+        env:
+          COMPAT_TEST_BASE_URL: ${{ inputs.base_url }}
+          CLOUDCRUISE_API_KEY: ${{ secrets.COMPAT_TEST_API_KEY }}
