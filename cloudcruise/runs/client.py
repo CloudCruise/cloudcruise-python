@@ -44,6 +44,7 @@ from .types import (
     RunHandle,
     FlattenedRunEvent,
     RunEventEnvelope,
+    LiveViewConnection,
 )
 from ..utils.types import to_dataclass
 
@@ -325,6 +326,24 @@ class RunsClient:
         path = f"/run/{session_id}"
         response = self._make_request("GET", path)
         return to_dataclass(response, RunResult)
+
+    def get_live_view_connection(self, session_id: str) -> LiveViewConnection:
+        """
+        Fetch a fresh live-view connection (viewer URL + auth token) for
+        watching an active session's browser stream. The auth token is
+        single-use, so reopening a previously used viewer link will fail —
+        call this again to mint a new one instead.
+
+        Only works while the session is still active; raises once the
+        session has ended.
+        """
+        path = f"/live/sessions/{session_id}/connection"
+        response = self._make_request("GET", path)
+        return LiveViewConnection(
+            url=response["url"],
+            session_id=response.get("sessionId", session_id),
+            auth_token=response["authToken"],
+        )
 
     def interrupt(self, session_id: str) -> None:
         path = f"/run/{session_id}/interrupt"

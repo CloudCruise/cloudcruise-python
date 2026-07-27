@@ -4,6 +4,7 @@ import unittest
 from cloudcruise.runs.client import RunsClient
 from cloudcruise.runs.types import (
     FlattenedRunEvent,
+    LiveViewConnection,
     RunResult,
     VideoUrl,
     WebhookEvent,
@@ -161,6 +162,27 @@ class TestRunDataclassResponses(unittest.TestCase):
 
         self.assertIsInstance(replay, WebhookReplayResponse)
         self.assertIsInstance(replay.webhook_events[0], WebhookEvent)
+
+    def test_get_live_view_connection_maps_camel_case_response(self):
+        requests = []
+
+        def make_request(method, path, body=None):
+            requests.append((method, path))
+            return {
+                "url": "https://live-view.cloudcruise.com/viewer?authToken=tok#session-1",
+                "sessionId": "session-1",
+                "authToken": "tok",
+            }
+
+        client = RunsClient(_FakeConnectionManager(), make_request)
+
+        connection = client.get_live_view_connection("session-1")
+
+        self.assertEqual(requests, [("GET", "/live/sessions/session-1/connection")])
+        self.assertIsInstance(connection, LiveViewConnection)
+        self.assertEqual(connection.url, "https://live-view.cloudcruise.com/viewer?authToken=tok#session-1")
+        self.assertEqual(connection.session_id, "session-1")
+        self.assertEqual(connection.auth_token, "tok")
 
     def test_wait_returns_run_result_dataclass(self):
         conn = _FakeConnectionManager()
