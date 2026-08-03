@@ -47,11 +47,14 @@ jobs:
 
       - name: Resolve and validate base_url
         id: resolve
+        env:
+          REPOSITORY_BASE_URL: ${{ github.event.client_payload.base_url }}
+          WORKFLOW_BASE_URL: ${{ inputs.base_url }}
         run: |
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            BASE_URL="${{ github.event.client_payload.base_url }}"
+            BASE_URL="$REPOSITORY_BASE_URL"
           else
-            BASE_URL="${{ inputs.base_url }}"
+            BASE_URL="$WORKFLOW_BASE_URL"
           fi
           case "$BASE_URL" in
             https://staging-api.cloudcruise.app) ;;
