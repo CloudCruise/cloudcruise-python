@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cloudcruise"
-version = "1.2.1"
+version = "1.3.0"
 description = "The official CloudCruise Python SDK"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,6 +14,7 @@ dependencies = [
   "requests>=2.31.0",
   "cryptography>=41.0.0",
   "typing_extensions>=4.0.0",
+  "jsonschema>=4.26.0",
 ]
 keywords = ["cloudcruise", "sdk", "automation", "workflows", "sse", "webhook"]
 classifiers = [
