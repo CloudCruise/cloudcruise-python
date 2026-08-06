@@ -8,6 +8,7 @@ from .types import (
     WorkflowMetadata,
     WorkflowPropertySchema,
     InputValidationError,
+    SchemaErrorDetail,
 )
 def _client():
     # Lazy import to avoid circular imports during package initialization
@@ -20,6 +21,7 @@ __all__ = [
     "WorkflowMetadata",
     "WorkflowPropertySchema",
     "InputValidationError",
+    "SchemaErrorDetail",
     # Convenience APIs
     "get_all_workflows",
     "get_workflow_metadata",

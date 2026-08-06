@@ -20,6 +20,7 @@ from .workflows.types import (
     WorkflowInputSchema,
     WorkflowMetadata,
     InputValidationError,
+    SchemaErrorDetail,
 )
 
 from .runs.types import (
@@ -94,6 +95,7 @@ __all__ = [
     "WorkflowInputSchema",
     "WorkflowMetadata",
     "InputValidationError",
+    "SchemaErrorDetail",
     # Run Types
     "EventType",
     "DryRun",

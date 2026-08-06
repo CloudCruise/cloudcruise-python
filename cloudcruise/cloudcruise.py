@@ -9,6 +9,7 @@ from .utils.env import get_env
 from .vault.client import VaultClient
 from .secret_providers.client import SecretProvidersClient
 from .workflows.client import WorkflowsClient
+from .workflows.validation import input_validation_error_from_response
 from .runs.client import RunsClient
 from .webhook.client import WebhookClient
 from .utils.connection_manager import ConnectionManager
@@ -80,13 +81,23 @@ class CloudCruise:
                 timeout=60,
             )
             if not resp.ok:
-                error_text = resp.text
                 error_message = f"HTTP {resp.status_code}: {resp.reason}"
                 try:
                     error_json = resp.json()
-                    error_message = error_json.get("message") or error_json.get("error") or error_message
                 except Exception:
-                    pass
+                    error_json = None
+                if isinstance(error_json, dict):
+                    validation_error = input_validation_error_from_response(
+                        error_json,
+                        body,
+                    )
+                    if validation_error is not None:
+                        raise validation_error
+                    error_message = (
+                        error_json.get("message")
+                        or error_json.get("error")
+                        or error_message
+                    )
                 raise RuntimeError(error_message)
 
             ctype = resp.headers.get("content-type", "")

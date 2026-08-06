@@ -57,6 +57,9 @@ class TestWorkflowDataclassResponses(unittest.TestCase):
                         "properties": {"url": {"type": "string"}},
                         "required": ["url"],
                         "additionalProperties": False,
+                        "definitions": {
+                            "url": {"type": "string", "pattern": "^https://"},
+                        },
                     }
                 }
             }
@@ -67,6 +70,7 @@ class TestWorkflowDataclassResponses(unittest.TestCase):
         self.assertIsInstance(metadata, WorkflowMetadata)
         self.assertIsInstance(metadata.input_schema, WorkflowInputSchema)
         self.assertEqual(metadata.input_schema.required, ["url"])
+        self.assertIn("definitions", metadata.input_schema._raw_schema)
 
 
 class _FakeSubscription:

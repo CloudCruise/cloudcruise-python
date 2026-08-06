@@ -49,18 +49,28 @@ try:
     client.workflows.validate_workflow_input("workflow-123", payload)
 except InputValidationError as exc:
     print("Validation failed:", exc)
-    print("Missing:", exc.missing_required)
-    print("Type issues:", exc.invalid_types)
+    print("Missing:", exc.missingRequired)
+    print("Type issues:", exc.invalidTypes)
+    print("Schema errors:", exc.schemaErrors)
     raise
 
 # If no exception is raised, the payload matches the schema.
 ```
 
-During validation the client checks:
+Validation follows JSON Schema Draft-07, including nested schemas, `pattern`,
+arrays and `items`, limits, `enum` and `const`, combinators, and local `$ref`
+references. It matches server behavior in these areas:
 
-- Required fields
-- Allowed value types (string, number, object, etc.)
-- Whether additional keys are permitted when the schema disallows extras
+- `format` is treated as an annotation and is not enforced.
+- `$ref` may reference locations within the same schema (`#/...`), but the SDK
+  will not fetch external schemas.
+- Invalid schemas fail closed with `InputValidationError`.
+
+`InputValidationError` retains `missingRequired`, `invalidTypes`, and
+`unknownKeys` for compatibility. `schemaErrors` contains every failure with
+`instancePath`, `schemaPath`, `keyword`, and `message`. If the server rejects
+an input that passed local validation, its `run_input_variables_errors` are
+normalized into the same exception and fields.
 
 ### Combining with Runs
 
