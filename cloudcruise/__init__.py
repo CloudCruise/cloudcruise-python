@@ -19,6 +19,7 @@ from .workflows.types import (
     Workflow,
     WorkflowInputSchema,
     WorkflowMetadata,
+    WorkflowVaultSchemaEntry,
     InputValidationError,
     SchemaErrorDetail,
 )
@@ -94,6 +95,7 @@ __all__ = [
     "Workflow",
     "WorkflowInputSchema",
     "WorkflowMetadata",
+    "WorkflowVaultSchemaEntry",
     "InputValidationError",
     "SchemaErrorDetail",
     # Run Types

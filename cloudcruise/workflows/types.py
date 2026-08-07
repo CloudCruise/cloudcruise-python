@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 
 @dataclass
@@ -38,8 +38,17 @@ class WorkflowInputSchema:
 
 
 @dataclass
+class WorkflowVaultSchemaEntry:
+    type: Optional[Literal["credential"]] = None
+    domain: Optional[str] = None
+    example: Optional[str] = None
+
+
+@dataclass
 class WorkflowMetadata:
     input_schema: WorkflowInputSchema
+    workspace_id: Optional[str] = None
+    vault_schema: Dict[str, WorkflowVaultSchemaEntry] = field(default_factory=dict)
 
 
 @dataclass

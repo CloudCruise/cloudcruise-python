@@ -7,6 +7,7 @@ from .types import (
     WorkflowInputSchema,
     WorkflowMetadata,
     WorkflowPropertySchema,
+    WorkflowVaultSchemaEntry,
     InputValidationError,
     SchemaErrorDetail,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "WorkflowInputSchema",
     "WorkflowMetadata",
     "WorkflowPropertySchema",
+    "WorkflowVaultSchemaEntry",
     "InputValidationError",
     "SchemaErrorDetail",
     # Convenience APIs
