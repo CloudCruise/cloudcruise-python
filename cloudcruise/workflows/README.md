@@ -29,6 +29,10 @@ print(workflows[0].id)
 # Fetch metadata for a single workflow
 metadata = client.workflows.get_workflow_metadata("workflow-123")
 print(metadata.input_schema.required)
+print(metadata.workspace_id)
+
+for variable_name, credential in metadata.vault_schema.items():
+    print(variable_name, credential.domain, credential.example)
 ```
 
 ### Validating Workflow Input

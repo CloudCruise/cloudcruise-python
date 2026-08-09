@@ -17,6 +17,7 @@ from cloudcruise.workflows.types import (
     Workflow,
     WorkflowInputSchema,
     WorkflowMetadata,
+    WorkflowVaultSchemaEntry,
 )
 
 
@@ -48,6 +49,43 @@ class TestWorkflowDataclassResponses(unittest.TestCase):
         self.assertEqual(workflows[0].id, "wf-1")
         self.assertFalse(hasattr(workflows[0], "future_field"))
 
+    def test_get_workflow_metadata_returns_complete_api_response(self):
+        client = WorkflowsClient(
+            lambda *_: {
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"url": {"type": "string"}},
+                    "required": ["url"],
+                    "definitions": {
+                        "url": {"type": "string", "pattern": "^https://"},
+                    },
+                },
+                "workspace_id": "workspace-1",
+                "vault_schema": {
+                    "USER": {
+                        "type": "credential",
+                        "domain": "https://example.com",
+                        "example": "vault-entry-1",
+                    }
+                },
+            }
+        )
+
+        metadata = client.get_workflow_metadata("wf-1")
+
+        self.assertIsInstance(metadata, WorkflowMetadata)
+        self.assertEqual(metadata.workspace_id, "workspace-1")
+        self.assertIsInstance(metadata.input_schema, WorkflowInputSchema)
+        self.assertIn("definitions", metadata.input_schema._raw_schema)
+        self.assertIsInstance(
+            metadata.vault_schema["USER"],
+            WorkflowVaultSchemaEntry,
+        )
+        self.assertEqual(
+            metadata.vault_schema["USER"].domain,
+            "https://example.com",
+        )
+
     def test_get_workflow_metadata_returns_nested_dataclass(self):
         client = WorkflowsClient(
             lambda *_: {
@@ -71,6 +109,8 @@ class TestWorkflowDataclassResponses(unittest.TestCase):
         self.assertIsInstance(metadata.input_schema, WorkflowInputSchema)
         self.assertEqual(metadata.input_schema.required, ["url"])
         self.assertIn("definitions", metadata.input_schema._raw_schema)
+        self.assertIsNone(metadata.workspace_id)
+        self.assertEqual(metadata.vault_schema, {})
 
 
 class _FakeSubscription:
