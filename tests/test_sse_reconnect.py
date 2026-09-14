@@ -13,6 +13,8 @@ have nothing to do with it.
 No network access: the stand-in server binds to a loopback ephemeral port.
 """
 
+from __future__ import annotations
+
 import json
 import threading
 import time
@@ -76,7 +78,7 @@ class _CountingSSEHandler(BaseHTTPRequestHandler):
         return
 
 
-class SSEReconnectContractTest(unittest.TestCase):
+class TestSSEReconnectContract(unittest.TestCase):
     """unittest, per AGENTS.md: the documented suite command is `python -m unittest discover`."""
 
     def setUp(self):
