@@ -5,6 +5,7 @@ import time
 import uuid
 from typing import Any, Dict, Optional, Set, Iterator
 
+from .._client_identity import CLIENT_IDENTITY_HEADERS
 from .sse import open_sse, SSEHandlers, SSEConnection
 from .events import SimpleEventEmitter
 from .async_queue import AsyncEventQueue
@@ -108,7 +109,7 @@ class ConnectionManager:
 
         self._connecting = True
         url = f"{self._base_url}/run/clients/{self._client_id}/events"
-        headers = {"cc-key": self._api_key}
+        headers = {**CLIENT_IDENTITY_HEADERS, "cc-key": self._api_key}
 
         def on_open() -> None:
             with self._lock:
