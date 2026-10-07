@@ -5,6 +5,7 @@ from typing import Any, Optional
 import json
 import requests
 
+from ._client_identity import CLIENT_IDENTITY_HEADERS
 from .utils.env import get_env
 from .vault.client import VaultClient
 from .secret_providers.client import SecretProvidersClient
@@ -66,6 +67,7 @@ class CloudCruise:
         """
         url = f"{self._base_url}{path}"
         headers = {
+            **CLIENT_IDENTITY_HEADERS,
             "cc-key": self._api_key,
         }
         try:

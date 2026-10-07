@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+
+- Requests send `X-CloudCruise-Client: sdk-python/<version>`.
+
 ## 1.3.1
 
 ### Fixed
