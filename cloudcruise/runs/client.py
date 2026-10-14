@@ -322,6 +322,29 @@ class RunsClient:
         path = f"/run/{session_id}/new_input_variables"
         self._make_request("POST", path, {"input_variables": input_variables})
 
+    def submit_decision(
+        self, session_id: str, chosen_option: str, save: bool = False
+    ) -> None:
+        """
+        Respond to an execution.input_required event whose reason is
+        "non_dismissible_popup" by choosing one of the decision options by its
+        label. Set save=True to persist the choice so future matching runs
+        auto-apply it without pausing.
+
+        Mutually exclusive with submit_input_variables on the same session.
+
+        Args:
+            session_id: The session waiting for input.
+            chosen_option: The exact option label to choose.
+            save: Persist the choice for auto-apply on future matching runs.
+        """
+        path = f"/run/{session_id}/new_input_variables"
+        self._make_request(
+            "POST",
+            path,
+            {"chosen_option": chosen_option, "save_decision": save},
+        )
+
     def get_results(self, session_id: str) -> RunResult:
         path = f"/run/{session_id}"
         response = self._make_request("GET", path)
