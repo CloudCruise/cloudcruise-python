@@ -205,6 +205,34 @@ webhook_handle = client.runs.start(
 )
 ```
 
+### Pinning the Workflow Version
+
+By default a run executes the head of the workflow's default branch. Set at
+most one of the following to pin it instead (setting both raises `ValueError`):
+
+```python
+# Highest tagged release matching an exact version or semver range
+# ("1.2.3", "^1.2.0", "~1.2.3", "1.x", ">=1.2.3 <2.0.0").
+pinned_handle = client.runs.start(
+    StartRunRequest(
+        workflow_id="workflow-123",
+        run_input_variables={"url": "https://example.com"},
+        workflow_version="^1.2.0",
+    )
+)
+
+# Head of a specific workflow branch.
+branch_handle = client.runs.start(
+    StartRunRequest(
+        workflow_id="workflow-123",
+        run_input_variables={"url": "https://example.com"},
+        workflow_branch_id="3f6c2a8e-6b1d-4c3e-9a51-2d7f0e8b4c19",
+    )
+)
+```
+
+Unset pins are omitted from the request payload.
+
 ### Session Utilities
 
 - `client.runs.get_results(session_id)` – Retrieve the latest run snapshot.

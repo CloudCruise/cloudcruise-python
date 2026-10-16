@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `StartRunRequest.workflow_version` pins a run to the highest tagged release matching an exact version or semver range, and `StartRunRequest.workflow_branch_id` runs the head of a workflow branch instead of the default branch. Setting both raises `ValueError`; unset pins are omitted from the `POST /run` payload. Requires a backend with run version pinning.
+
 ## 1.4.0
 
 ### Added
