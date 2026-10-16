@@ -1,16 +1,35 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlencode
 
 from .types import (
     Workflow,
+    WorkflowBranch,
     WorkflowMetadata,
     WorkflowInputSchema,
+    WorkflowVersion,
     InputValidationError,
     SchemaErrorDetail,
 )
 from .validation import validate_input_schema
 from ..utils.types import to_dataclass
+
+
+def _version_selector(
+    workflow_version: Optional[str], workflow_branch_id: Optional[str]
+) -> Dict[str, str]:
+    selector = {
+        key: value
+        for key, value in (
+            ("workflow_version", workflow_version),
+            ("workflow_branch_id", workflow_branch_id),
+        )
+        if value is not None
+    }
+    if len(selector) > 1:
+        raise ValueError("At most one of workflow_version, workflow_branch_id may be set")
+    return selector
 
 class WorkflowsClient:
     def __init__(self, make_request) -> None:
@@ -20,9 +39,34 @@ class WorkflowsClient:
         response = self._make_request("GET", "/workflows")
         return [to_dataclass(item, Workflow) for item in response]
 
-    def get_workflow_metadata(self, workflow_id: str) -> WorkflowMetadata:
+    def get_workflow_metadata(
+        self,
+        workflow_id: str,
+        *,
+        workflow_version: Optional[str] = None,
+        workflow_branch_id: Optional[str] = None,
+    ) -> WorkflowMetadata:
+        """Describe the input and vault schemas of one workflow version.
+
+        Without a selector this is the latest version on the default branch.
+        ``workflow_version`` (exact version or semver range) or
+        ``workflow_branch_id`` select the same version a run started with that
+        pin would execute; at most one may be set.
+        """
+        selector = _version_selector(workflow_version, workflow_branch_id)
+        query = {
+            ("version" if key == "workflow_version" else "branch_id"): value
+            for key, value in selector.items()
+        }
         path = f"/workflows/{workflow_id}/metadata"
+        if query:
+            path = f"{path}?{urlencode(query)}"
         response = self._make_request("GET", path)
+        if selector and isinstance(response, dict) and "version_id" not in response:
+            raise RuntimeError(
+                "This CloudCruise API does not support selecting a workflow version or branch "
+                "for metadata yet; its response describes the default branch instead"
+            )
         if isinstance(response, dict) and "input_schema" not in response:
             nested = response.get("metadata")
             if isinstance(nested, dict) and "input_schema" in nested:
@@ -36,8 +80,31 @@ class WorkflowsClient:
             metadata.input_schema._raw_schema = raw_schema
         return metadata
 
-    def validate_workflow_input(self, workflow_id: str, payload: Dict[str, Any]) -> None:
-        meta = self.get_workflow_metadata(workflow_id)
+    def list_workflow_versions(self, workflow_id: str) -> List[WorkflowVersion]:
+        """List every version of a workflow across all branches, newest first."""
+        response = self._make_request("GET", f"/workflows/{workflow_id}/versions")
+        return [to_dataclass(item, WorkflowVersion) for item in response]
+
+    def list_workflow_branches(self, workflow_id: str) -> List[WorkflowBranch]:
+        """List a workflow's branches, oldest first; ``is_default`` marks the default branch."""
+        response = self._make_request("GET", f"/workflows/{workflow_id}/branches")
+        return [to_dataclass(item, WorkflowBranch) for item in response]
+
+    def validate_workflow_input(
+        self,
+        workflow_id: str,
+        payload: Dict[str, Any],
+        *,
+        workflow_version: Optional[str] = None,
+        workflow_branch_id: Optional[str] = None,
+    ) -> None:
+        """Check a payload against a workflow version's input schema.
+
+        Takes the same optional version or branch selector as
+        ``get_workflow_metadata``. Raises ``InputValidationError`` if invalid.
+        """
+        selector = _version_selector(workflow_version, workflow_branch_id)
+        meta = self.get_workflow_metadata(workflow_id, **selector)
 
         raw_schema: Any = None
         if isinstance(meta, dict):

@@ -35,11 +35,41 @@ for variable_name, credential in metadata.vault_schema.items():
     print(variable_name, credential.domain, credential.example)
 ```
 
+### Versions and Branches
+
+Metadata describes the latest version on the workflow's default branch unless
+you select another one. `get_workflow_metadata` and `validate_workflow_input`
+take the same optional selectors as `runs.start()`; set at most one (setting
+both raises `ValueError`):
+
+```python
+# Highest release matching an exact version or semver range
+metadata = client.workflows.get_workflow_metadata("workflow-123", workflow_version="^1.2.0")
+print(metadata.version, metadata.version_id)
+
+# Latest version on a branch
+metadata = client.workflows.get_workflow_metadata(
+    "workflow-123", workflow_branch_id="3f6c2a8e-6b1d-4c3e-9a51-2d7f0e8b4c19"
+)
+
+# Every version across all branches, newest first
+for version in client.workflows.list_workflow_versions("workflow-123"):
+    print(version.version, version.branch_id, version.version_note)
+
+# Branches, oldest first; is_default marks the branch unpinned runs use
+for branch in client.workflows.list_workflow_branches("workflow-123"):
+    print(branch.id, branch.name, branch.is_default)
+```
+
+`metadata.version`, `metadata.version_id` and `metadata.branch_id` identify
+the version that was described. Against an API without version selection, a
+selector raises `RuntimeError` instead of returning the default branch's
+schemas.
+
 ### Validating Workflow Input
 
-The SDK can proactively validate run payloads against the workflow's input
-schema. `RunsClient.start` calls this automatically when metadata is available,
-but you can use it directly:
+The SDK can validate run payloads against a workflow version's input schema
+before you start a run:
 
 ```python
 from cloudcruise.workflows.types import InputValidationError
@@ -77,9 +107,9 @@ references. It matches server behavior in these areas:
 `runs.start()` does not call this method. The server validates
 `run_input_variables` against the input schema of the version that runs, and
 its `run_input_variables_errors` are normalized into the same
-`InputValidationError` and fields. Call `validate_workflow_input` yourself to
-check a payload against the default branch's latest version without starting
-a run.
+`InputValidationError` and fields. Call `validate_workflow_input` yourself,
+with the same `workflow_version` or `workflow_branch_id` you will start the run
+with, to check a payload without starting a run.
 
 ### Combining with Runs
 

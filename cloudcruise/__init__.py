@@ -17,9 +17,11 @@ from .secret_providers.types import (
 
 from .workflows.types import (
     Workflow,
+    WorkflowBranch,
     WorkflowInputSchema,
     WorkflowMetadata,
     WorkflowVaultSchemaEntry,
+    WorkflowVersion,
     InputValidationError,
     SchemaErrorDetail,
 )
@@ -93,9 +95,11 @@ __all__ = [
     "SecretProviderType",
     # Workflow Types
     "Workflow",
+    "WorkflowBranch",
     "WorkflowInputSchema",
     "WorkflowMetadata",
     "WorkflowVaultSchemaEntry",
+    "WorkflowVersion",
     "InputValidationError",
     "SchemaErrorDetail",
     # Run Types
