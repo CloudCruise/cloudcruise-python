@@ -6,6 +6,10 @@
 
 - `StartRunRequest.workflow_version` pins a run to the highest tagged release matching an exact version or semver range, and `StartRunRequest.workflow_branch_id` runs the head of a workflow branch instead of the default branch. Setting both raises `ValueError`; unset pins are omitted from the `POST /run` payload. Requires a backend with run version pinning.
 
+### Changed
+
+- `runs.start()` no longer fetches workflow metadata to validate `run_input_variables` locally before `POST /run`. The server validates them against the version that actually runs and its errors are raised as the same `InputValidationError`, so runs pinned to a version or branch with a different input schema are no longer rejected, and every run saves one request. `workflows.validate_workflow_input()` is unchanged for callers who want to check a payload up front.
+
 ## 1.4.0
 
 ### Added

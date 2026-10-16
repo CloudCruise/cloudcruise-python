@@ -75,7 +75,6 @@ class RunsClient:
                 "run_input_variables": run_input_variables,
             }
         else:
-            workflow_id = request.workflow_id
             run_input_variables = request.run_input_variables or {}
             request.run_input_variables = run_input_variables
         version_pins = [
@@ -85,9 +84,6 @@ class RunsClient:
         ]
         if len(version_pins) > 1:
             raise ValueError(f"At most one of {', '.join(version_pins)} may be set when starting a run")
-        if self._workflows is not None:
-            # Validate input variables proactively
-            self._workflows.validate_workflow_input(workflow_id, run_input_variables)
 
         client_id = self._connection_manager.ensure_client_id()
         self._connection_manager.connect_if_needed()

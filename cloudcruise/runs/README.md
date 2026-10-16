@@ -26,8 +26,8 @@ client = CloudCruise(
 # instantiate with `client = CloudCruise()`.
 
 # Start a workflow run.
-# run_input_variables are validated against the workflow's input schema when
-# metadata is available.
+# The server validates run_input_variables against the input schema of the
+# version that runs and raises InputValidationError if they don't match.
 handle = client.runs.start(
     StartRunRequest(
         workflow_id="workflow-123",

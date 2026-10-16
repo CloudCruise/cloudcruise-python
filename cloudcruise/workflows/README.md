@@ -72,9 +72,14 @@ references. It matches server behavior in these areas:
 
 `InputValidationError` retains `missingRequired`, `invalidTypes`, and
 `unknownKeys` for compatibility. `schemaErrors` contains every failure with
-`instancePath`, `schemaPath`, `keyword`, and `message`. If the server rejects
-an input that passed local validation, its `run_input_variables_errors` are
-normalized into the same exception and fields.
+`instancePath`, `schemaPath`, `keyword`, and `message`.
+
+`runs.start()` does not call this method. The server validates
+`run_input_variables` against the input schema of the version that runs, and
+its `run_input_variables_errors` are normalized into the same
+`InputValidationError` and fields. Call `validate_workflow_input` yourself to
+check a payload against the default branch's latest version without starting
+a run.
 
 ### Combining with Runs
 

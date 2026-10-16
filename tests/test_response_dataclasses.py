@@ -13,7 +13,6 @@ from cloudcruise.runs.types import (
 from cloudcruise.utils.events import SimpleEventEmitter
 from cloudcruise.workflows.client import WorkflowsClient
 from cloudcruise.workflows.types import (
-    InputValidationError,
     Workflow,
     WorkflowInputSchema,
     WorkflowMetadata,
@@ -152,12 +151,6 @@ class _FakeConnectionManager:
         return self.subscription
 
 
-class _RequiredInputWorkflows:
-    def validate_workflow_input(self, workflow_id, payload):
-        if "url" not in payload:
-            raise InputValidationError("missing required: url", ["url"])
-
-
 class TestRunDataclassResponses(unittest.TestCase):
     def test_get_results_returns_nested_dataclasses(self):
         client = RunsClient(
@@ -272,18 +265,6 @@ class TestRunDataclassResponses(unittest.TestCase):
         self.assertEqual(events[0].timestamp, 1)
         self.assertEqual(events[0].expires_at, 2)
         self.assertEqual(events[0].raw["event"], "run.event")
-
-    def test_start_dict_without_inputs_normalizes_to_empty_dict_before_validation(self):
-        client = RunsClient(
-            _FakeConnectionManager(),
-            lambda *_: {"session_id": "session-1"},
-            _RequiredInputWorkflows(),
-        )
-
-        with self.assertRaises(InputValidationError) as ctx:
-            client.start({"workflow_id": "wf-1"})
-
-        self.assertEqual(ctx.exception.missingRequired, ["url"])
 
     def test_start_dict_requires_workflow_id(self):
         client = RunsClient(_FakeConnectionManager(), lambda *_: {"session_id": "session-1"})
