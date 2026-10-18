@@ -49,6 +49,31 @@ class WorkflowMetadata:
     input_schema: WorkflowInputSchema
     workspace_id: Optional[str] = None
     vault_schema: Dict[str, WorkflowVaultSchemaEntry] = field(default_factory=dict)
+    version_id: Optional[str] = None
+    version: Optional[str] = None
+    branch_id: Optional[str] = None
+
+
+@dataclass
+class WorkflowVersion:
+    version_id: str
+    version: str
+    created_at: str
+    branch_id: Optional[str] = None
+    version_note: Optional[str] = None
+    created_by: Optional[str] = None
+
+
+@dataclass
+class WorkflowBranch:
+    id: str
+    name: str
+    head_version_id: str
+    created_at: str
+    workflow_id: Optional[str] = None
+    is_default: bool = False
+    created_by: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 @dataclass

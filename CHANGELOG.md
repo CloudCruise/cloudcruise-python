@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+
+- `StartRunRequest.workflow_version` pins a run to the highest tagged release matching an exact version or semver range, and `StartRunRequest.workflow_branch_id` runs the head of a workflow branch instead of the default branch. Setting both raises `ValueError`; unset pins are omitted from the `POST /run` payload. Requires a backend with run version pinning.
+- `workflows.get_workflow_metadata()` and `workflows.validate_workflow_input()` take the same optional keyword-only `workflow_version` / `workflow_branch_id` selectors, so schemas can be read and checked for the version a pinned run executes. `WorkflowMetadata` gains `version_id`, `version` and `branch_id`. A selector against an API without version selection raises `RuntimeError` instead of returning the default branch's schemas.
+- `workflows.list_workflow_versions()` returns `WorkflowVersion` entries (including their `branch_id`) and `workflows.list_workflow_branches()` returns `WorkflowBranch` entries with `is_default`. The module-level `cloudcruise.workflows` functions take the same selectors and add `list_workflow_versions()` / `list_workflow_branches()`.
+
+### Changed
+
+- `runs.start()` no longer fetches workflow metadata to validate `run_input_variables` locally before `POST /run`. The server validates them against the version that actually runs and its errors are raised as the same `InputValidationError`, so runs pinned to a version or branch with a different input schema are no longer rejected, and every run saves one request. `workflows.validate_workflow_input()` is unchanged for callers who want to check a payload up front.
+
 ## 1.4.0
 
 ### Added

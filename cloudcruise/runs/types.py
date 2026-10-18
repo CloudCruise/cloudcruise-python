@@ -72,6 +72,11 @@ class StartRunRequest:
     webhook: Optional[PayloadWebhook] = None
     additional_context: Optional[Dict[str, Any]] = None
     client_id: Optional[str] = None
+    # Exact version ("1.2.3") or semver range ("^1.2.0", "~1.2.3", "1.x",
+    # ">=1.2.3 <2.0.0"); the run uses the highest tagged release that matches.
+    workflow_version: Optional[str] = None
+    # Run the head of this workflow branch (uuid) instead of the default branch.
+    workflow_branch_id: Optional[str] = None
 
 
 @dataclass

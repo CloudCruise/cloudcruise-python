@@ -48,6 +48,8 @@ from .types import (
 )
 from ..utils.types import to_dataclass
 
+_VERSION_PIN_FIELDS = ("workflow_version", "workflow_branch_id")
+
 class RunsClient:
     def __init__(
         self,
@@ -73,12 +75,15 @@ class RunsClient:
                 "run_input_variables": run_input_variables,
             }
         else:
-            workflow_id = request.workflow_id
             run_input_variables = request.run_input_variables or {}
             request.run_input_variables = run_input_variables
-        if self._workflows is not None:
-            # Validate input variables proactively
-            self._workflows.validate_workflow_input(workflow_id, run_input_variables)
+        version_pins = [
+            key
+            for key in _VERSION_PIN_FIELDS
+            if (request.get(key) if isinstance(request, dict) else getattr(request, key)) is not None
+        ]
+        if len(version_pins) > 1:
+            raise ValueError(f"At most one of {', '.join(version_pins)} may be set when starting a run")
 
         client_id = self._connection_manager.ensure_client_id()
         self._connection_manager.connect_if_needed()
@@ -90,7 +95,11 @@ class RunsClient:
         payload = asdict(request) if is_dataclass(request) else (
             dict(request) if isinstance(request, dict) else request.__dict__
         )
-        resp = self._make_request("POST", "/run", payload)
+        # Backends without run version pinning reject unknown fields even when null.
+        for key in _VERSION_PIN_FIELDS:
+            if payload.get(key) is None:
+                payload.pop(key, None)
+        resp =self._make_request("POST", "/run", payload)
         session_id: Optional[str]
         if isinstance(resp, dict):
             session_id = resp.get("session_id") or resp.get("sessionId")
