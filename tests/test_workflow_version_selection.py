@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import unittest
 from typing import Any
+from unittest.mock import patch
 
-from cloudcruise import InputValidationError, WorkflowBranch, WorkflowVersion
+import cloudcruise.workflows as workflows_module
+from cloudcruise import (
+    InputValidationError,
+    WorkflowBranch,
+    WorkflowMetadata,
+    WorkflowVersion,
+)
 from cloudcruise.workflows.client import WorkflowsClient
 
 _LATEST_METADATA = {
@@ -98,6 +105,45 @@ class TestWorkflowMetadataVersionSelection(unittest.TestCase):
             WorkflowsClient(api).get_workflow_metadata("wf-1", workflow_version="1.2.3")
 
 
+    def test_metadata_with_a_selector_accepts_the_wrapped_response_shape(self) -> None:
+        """The client already unwraps {"metadata": {...}} responses; a selected read in
+        that shape carries version_id inside the wrapper and must not be mistaken for an
+        API that ignored the selector."""
+        api = _RecordingApi({"/workflows/wf-1/metadata?version=1.2.3": {"metadata": _PINNED_METADATA}})
+
+        metadata = WorkflowsClient(api).get_workflow_metadata("wf-1", workflow_version="1.2.3")
+
+        self.assertEqual(metadata.version_id, "version-1-2-3")
+
+
+class TestModuleLevelConvenienceFunctions(unittest.TestCase):
+    def test_module_functions_pass_selectors_and_list_through_the_default_client(self) -> None:
+        """cloudcruise.workflows' convenience functions use the shared default client;
+        they must offer the same selectors and list methods as WorkflowsClient, or
+        callers of that API can't use them."""
+        api = _RecordingApi({
+            "/workflows/wf-1/metadata?branch_id=branch-feature": _PINNED_METADATA,
+            "/workflows/wf-1/versions": [],
+            "/workflows/wf-1/branches": [],
+        })
+
+        class _DefaultClient:
+            workflows = WorkflowsClient(api)
+
+        with patch("cloudcruise._default.get_client", return_value=_DefaultClient()):
+            workflows_module.validate_workflow_input(
+                "wf-1", {"field_of_1_x": "x"}, workflow_branch_id="branch-feature"
+            )
+            self.assertEqual(workflows_module.list_workflow_versions("wf-1"), [])
+            self.assertEqual(workflows_module.list_workflow_branches("wf-1"), [])
+
+        self.assertEqual(api.requests, [
+            ("GET", "/workflows/wf-1/metadata?branch_id=branch-feature"),
+            ("GET", "/workflows/wf-1/versions"),
+            ("GET", "/workflows/wf-1/branches"),
+        ])
+
+
 class TestValidateWorkflowInputVersionSelection(unittest.TestCase):
     def test_validation_with_a_version_uses_that_versions_schema(self) -> None:
         """A payload built for an older release must pass against that release's
@@ -118,7 +164,7 @@ class TestValidateWorkflowInputVersionSelection(unittest.TestCase):
         that way."""
 
         class _OneArgumentOverride(WorkflowsClient):
-            def get_workflow_metadata(self, workflow_id: str):  # type: ignore[override]
+            def get_workflow_metadata(self, workflow_id: str) -> WorkflowMetadata:  # type: ignore[override]
                 return WorkflowsClient(_RecordingApi({"/workflows/wf-1/metadata": _LATEST_METADATA})).get_workflow_metadata(workflow_id)
 
         _OneArgumentOverride(_RecordingApi({})).validate_workflow_input("wf-1", {"added_in_latest": "x"})

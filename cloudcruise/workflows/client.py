@@ -62,15 +62,15 @@ class WorkflowsClient:
         if query:
             path = f"{path}?{urlencode(query)}"
         response = self._make_request("GET", path)
+        if isinstance(response, dict) and "input_schema" not in response:
+            nested = response.get("metadata")
+            if isinstance(nested, dict) and "input_schema" in nested:
+                response = nested
         if selector and isinstance(response, dict) and "version_id" not in response:
             raise RuntimeError(
                 "This CloudCruise API does not support selecting a workflow version or branch "
                 "for metadata yet; its response describes the default branch instead"
             )
-        if isinstance(response, dict) and "input_schema" not in response:
-            nested = response.get("metadata")
-            if isinstance(nested, dict) and "input_schema" in nested:
-                response = nested
         raw_schema = response.get("input_schema") if isinstance(response, dict) else None
         metadata = to_dataclass(response, WorkflowMetadata)
         if (
