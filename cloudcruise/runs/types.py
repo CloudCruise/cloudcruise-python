@@ -26,7 +26,7 @@ EventType = Literal[
     "execution.queued",
     "execution.start",
     "execution.step",
-    "execution.pause",
+    "execution.paused",
     "execution.stopped",
     "execution.failed",
     "execution.success",
