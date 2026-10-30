@@ -72,6 +72,16 @@ from .events.types import (
     ExecutionInputRequiredPayload,
 )
 
+from .events.types import (
+    ExecutionPasswordRecoveryPayload,
+    ExecutionPasswordUpdatedPayload,
+    RecoveryErrorCategory,
+    RecoveryWebhookEventPayload,
+    AgentRecoveryPayload,
+    AgentDecisionRequestedPayload,
+    AgentDecisionAnsweredPayload,
+)
+
 from .webhook.types import WebhookPayload, WebhookVerificationOptions, VerificationError, WebhookMessage
 from ._default import get_client as client
 
@@ -141,6 +151,14 @@ __all__ = [
     "PopupRetry",
     "PopupContext",
     "ExecutionInputRequiredPayload",
+    # Recovery and Decision Required Types
+    "ExecutionPasswordRecoveryPayload",
+    "ExecutionPasswordUpdatedPayload",
+    "RecoveryErrorCategory",
+    "RecoveryWebhookEventPayload",
+    "AgentRecoveryPayload",
+    "AgentDecisionRequestedPayload",
+    "AgentDecisionAnsweredPayload",
     # Webhook Types
     "WebhookPayload",
     "WebhookVerificationOptions",

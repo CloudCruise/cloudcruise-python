@@ -117,6 +117,64 @@ class ExecutionInputRequiredPayload(TypedDict, total=False):
     popup_context: "PopupContext"  # optional, present iff reason == "non_dismissible_popup"
 
 
+class ExecutionPasswordRecoveryPayload(TypedDict, total=False):
+    session_id: str
+    workflow_id: str
+    phase: Literal["started", "analyzing_form", "submitting", "verifying", "resuming", "completed", "failed"]
+    message: str
+    resume_mode: Literal["login", "original_node"]  # optional
+
+
+class ExecutionPasswordUpdatedPayload(TypedDict):
+    session_id: str
+    workflow_id: str
+
+
+RecoveryErrorCategory = Literal[
+    "XPATH_INCORRECT",
+    "INCORRECT_INPUTS",
+    "UNEXPECTED_UI_STATE",
+    "AUTHENTICATION_ERROR",
+    "PASSWORD_UPDATE_REQUIRED",
+    "PAGE_STILL_LOADING",
+    "SERVICE_UNAVAILABLE",
+    "NOT_CONFIDENT",
+    "INTERNAL_ERROR",
+    "IGNORE_ERROR",
+]
+
+
+class RecoveryWebhookEventPayload(TypedDict):
+    category: RecoveryErrorCategory
+    subType: str | None
+    outcome: Literal["resume", "requeue", "fail"]
+    resumeNodeTitle: str | None
+
+
+class AgentRecoveryPayload(RecoveryWebhookEventPayload):
+    session_id: str
+    workflow_id: str
+
+
+class AgentDecisionRequestedPayload(TypedDict):
+    session_id: str
+    workflow_id: str
+    decision_request_id: str
+    requested_at: str
+    expires_at: str
+
+
+class AgentDecisionAnsweredPayload(TypedDict, total=False):
+    session_id: str
+    workflow_id: str
+    decision_request_id: str
+    requested_at: str
+    answered_at: str
+    expires_at: str
+    outcome: Literal["answered", "declined", "expired"]
+    answered_via: Literal["slack", "web", "api"]  # optional
+
+
 class ExecutionRequeuedPayload(TypedDict, total=False):
     session_id: str
     workflow_id: str
