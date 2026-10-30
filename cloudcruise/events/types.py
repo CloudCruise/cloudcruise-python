@@ -156,23 +156,34 @@ class AgentRecoveryPayload(RecoveryWebhookEventPayload):
     workflow_id: str
 
 
-class AgentDecisionRequestedPayload(TypedDict):
-    session_id: str
-    workflow_id: str
-    decision_request_id: str
+DecisionWebhookOutcome = Literal["answered", "declined", "expired", "cancelled"]
+
+DecisionWebhookAnsweredVia = Literal["slack", "web", "api"]
+
+
+class DecisionRequestedWebhookEventPayload(TypedDict):
+    decision_id: str
     requested_at: str
     expires_at: str
 
 
-class AgentDecisionAnsweredPayload(TypedDict, total=False):
+class DecisionAnsweredWebhookEventPayload(TypedDict):
+    decision_id: str
+    requested_at: str
+    resolved_at: str
+    answered_at: str | None
+    outcome: DecisionWebhookOutcome
+    answered_via: DecisionWebhookAnsweredVia | None
+
+
+class AgentDecisionRequestedPayload(DecisionRequestedWebhookEventPayload):
     session_id: str
     workflow_id: str
-    decision_request_id: str
-    requested_at: str
-    answered_at: str
-    expires_at: str
-    outcome: Literal["answered", "declined", "expired"]
-    answered_via: Literal["slack", "web", "api"]  # optional
+
+
+class AgentDecisionAnsweredPayload(DecisionAnsweredWebhookEventPayload):
+    session_id: str
+    workflow_id: str
 
 
 class ExecutionRequeuedPayload(TypedDict, total=False):

@@ -78,6 +78,10 @@ from .events.types import (
     RecoveryErrorCategory,
     RecoveryWebhookEventPayload,
     AgentRecoveryPayload,
+    DecisionWebhookOutcome,
+    DecisionWebhookAnsweredVia,
+    DecisionRequestedWebhookEventPayload,
+    DecisionAnsweredWebhookEventPayload,
     AgentDecisionRequestedPayload,
     AgentDecisionAnsweredPayload,
 )
@@ -157,6 +161,10 @@ __all__ = [
     "RecoveryErrorCategory",
     "RecoveryWebhookEventPayload",
     "AgentRecoveryPayload",
+    "DecisionWebhookOutcome",
+    "DecisionWebhookAnsweredVia",
+    "DecisionRequestedWebhookEventPayload",
+    "DecisionAnsweredWebhookEventPayload",
     "AgentDecisionRequestedPayload",
     "AgentDecisionAnsweredPayload",
     # Webhook Types
