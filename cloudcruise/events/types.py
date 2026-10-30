@@ -156,7 +156,7 @@ class AgentRecoveryPayload(RecoveryWebhookEventPayload):
     workflow_id: str
 
 
-DecisionWebhookOutcome = Literal["answered", "declined", "expired", "cancelled"]
+DecisionWebhookOutcome = Literal["answered", "declined", "expired", "cancelled", "failed"]
 
 DecisionWebhookAnsweredVia = Literal["slack", "web", "api"]
 
