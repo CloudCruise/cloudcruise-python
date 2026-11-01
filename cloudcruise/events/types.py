@@ -148,11 +148,14 @@ class DecisionWebhookField(TypedDict):
 
 class DecisionRequestedWebhookEventPayload(TypedDict):
     decision_id: str
+    answer_by: str
     question: str
     context: str
     fields: list[DecisionWebhookField]
     free_text: bool
     respond_url: str
+    signed_screenshot_url: NotRequired[str]
+    signed_screenshot_url_expires: NotRequired[str]
 
 
 class DecisionWebhookAnswer(TypedDict, total=False):
