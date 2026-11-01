@@ -64,14 +64,6 @@ from .runs.types import (
     RunEventMessage,
 )
 
-# Modal recovery types (execution.input_required + non_dismissible_popup)
-from .events.types import (
-    AvailableAction,
-    PopupRetry,
-    PopupContext,
-    ExecutionInputRequiredPayload,
-)
-
 from .events.types import (
     ExecutionPasswordRecoveryPayload,
     ExecutionPasswordUpdatedPayload,
@@ -156,10 +148,6 @@ __all__ = [
     "EventWebhookMessage",
     "RunEventMessage",
     # Modal Recovery Types
-    "AvailableAction",
-    "PopupRetry",
-    "PopupContext",
-    "ExecutionInputRequiredPayload",
     # Recovery and Decision Required Types
     "ExecutionPasswordRecoveryPayload",
     "ExecutionPasswordUpdatedPayload",

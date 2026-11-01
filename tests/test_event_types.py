@@ -15,7 +15,6 @@ class TestEventTypes(unittest.TestCase):
                 "agent.recovery",
                 "agent.tfa_setup_recovery",
                 "execution.failed",
-                "execution.input_required",
                 "execution.password_recovery",
                 "execution.password_updated",
                 "execution.paused",

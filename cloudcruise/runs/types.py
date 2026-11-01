@@ -31,7 +31,6 @@ EventType = Literal[
     "execution.failed",
     "execution.success",
     "execution.requeued",
-    "execution.input_required",
     "file.uploaded",
     "screenshot.uploaded",
     "video.uploaded",
