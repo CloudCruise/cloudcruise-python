@@ -5,7 +5,7 @@
 ### Added
 
 - `EventType` covers every event the API sends: `agent.recovery`, `execution.password_recovery`, `execution.password_updated`, and `agent.tfa_setup_recovery`, with typed payloads for the first three. The `agent.recovery` payload is `AgentRecoveryPayload`: category, sub-type, outcome and resume node title, plus session and workflow ids.
-- Decision Required events `agent.decision_requested` and `agent.decision_answered`, typed as `AgentDecisionRequestedPayload` and `AgentDecisionAnsweredPayload`. Payloads carry `decision_id`, session and workflow ids, outcome (`answered`, `declined`, `expired`, `cancelled`, `failed`), answer channel and timestamps only, no free text.
+- Decision Required events `agent.decision_requested` and `agent.decision_answered`, typed as `AgentDecisionRequestedPayload` and `AgentDecisionAnsweredPayload`. `agent.decision_requested` carries the full question (question, context, fields with option ids, directives) and a `respond` object for answering through `POST /run/{session_id}/decision/respond`; `agent.decision_answered` carries the outcome (`answered`, `declined`, `expired`, `cancelled`, `failed`), who answered and the answer.
 
 ## 1.4.1
 

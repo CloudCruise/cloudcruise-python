@@ -160,11 +160,72 @@ DecisionWebhookOutcome = Literal["answered", "declined", "expired", "cancelled",
 
 DecisionWebhookAnsweredVia = Literal["slack", "web", "api"]
 
+DecisionWebhookDirective = Literal["requeue", "add_error_code", "fail"]
+
+DecisionWebhookFieldValue = str | int | float | bool | list[str]
+
+
+class DecisionWebhookOption(TypedDict):
+    id: str
+    label: str
+    description: str | None
+    note: str | None
+
+
+class DecisionWebhookField(TypedDict):
+    id: str
+    type: str
+    label: str
+    required: bool
+    options: list[DecisionWebhookOption] | None
+    placeholder: str | None
+    hint: str | None
+    min: float | None
+    max: float | None
+
+
+class DecisionWebhookRespondBody(TypedDict):
+    decision_id: str
+    values: dict[str, str]
+    text: str
+    directive: str
+
+
+class DecisionWebhookRespond(TypedDict):
+    method: Literal["POST"]
+    path: str
+    url: str | None
+    body: DecisionWebhookRespondBody
+
 
 class DecisionRequestedWebhookEventPayload(TypedDict):
     decision_id: str
     requested_at: str
     expires_at: str
+    question: str
+    context: str
+    headline: str | None
+    run_so_far: str | None
+    kind: str | None
+    error_code_label: str | None
+    workflow_name: str | None
+    run_url: str
+    fields: list[DecisionWebhookField]
+    accepts_free_text: bool
+    directives: list[DecisionWebhookDirective]
+    respond: DecisionWebhookRespond
+
+
+class DecisionWebhookAnswer(TypedDict):
+    text: str | None
+    values: dict[str, DecisionWebhookFieldValue]
+    directive: DecisionWebhookDirective | None
+    summary: str
+
+
+class DecisionWebhookAnsweredBy(TypedDict):
+    type: Literal["slack_user", "user", "api_key"]
+    id: str
 
 
 class DecisionAnsweredWebhookEventPayload(TypedDict):
@@ -174,6 +235,8 @@ class DecisionAnsweredWebhookEventPayload(TypedDict):
     answered_at: str | None
     outcome: DecisionWebhookOutcome
     answered_via: DecisionWebhookAnsweredVia | None
+    answered_by: DecisionWebhookAnsweredBy | None
+    answer: DecisionWebhookAnswer | None
 
 
 class AgentDecisionRequestedPayload(DecisionRequestedWebhookEventPayload):
