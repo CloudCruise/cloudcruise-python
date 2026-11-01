@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Generic, List, Literal, TypeVar, Union
 
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 # Re-use EventType from runs.types to avoid circular imports
 # We'll import it later after updating runs/types.py
@@ -168,75 +168,42 @@ DecisionWebhookFieldValue = str | int | float | bool | list[str]
 class DecisionWebhookOption(TypedDict):
     id: str
     label: str
-    description: str | None
-    note: str | None
+    note: NotRequired[str]
 
 
 class DecisionWebhookField(TypedDict):
     id: str
-    type: str
     label: str
-    required: bool
-    options: list[DecisionWebhookOption] | None
-    placeholder: str | None
-    hint: str | None
-    min: float | None
-    max: float | None
-
-
-class DecisionWebhookRespondBody(TypedDict):
-    decision_id: str
-    values: dict[str, str]
-    text: str
-    directive: str
-
-
-class DecisionWebhookRespond(TypedDict):
-    method: Literal["POST"]
-    path: str
-    url: str | None
-    body: DecisionWebhookRespondBody
+    type: str
+    options: NotRequired[list[DecisionWebhookOption]]
+    required: NotRequired[Literal[False]]
+    min: NotRequired[float]
+    max: NotRequired[float]
+    placeholder: NotRequired[str]
+    hint: NotRequired[str]
 
 
 class DecisionRequestedWebhookEventPayload(TypedDict):
     decision_id: str
-    requested_at: str
-    expires_at: str
     question: str
     context: str
-    headline: str | None
-    run_so_far: str | None
-    kind: str | None
-    error_code_label: str | None
-    workflow_name: str | None
-    run_url: str
     fields: list[DecisionWebhookField]
-    accepts_free_text: bool
-    directives: list[DecisionWebhookDirective]
-    respond: DecisionWebhookRespond
+    free_text: bool
+    respond_url: str
 
 
-class DecisionWebhookAnswer(TypedDict):
-    text: str | None
+class DecisionWebhookAnswer(TypedDict, total=False):
     values: dict[str, DecisionWebhookFieldValue]
-    directive: DecisionWebhookDirective | None
-    summary: str
-
-
-class DecisionWebhookAnsweredBy(TypedDict):
-    type: Literal["slack_user", "user", "api_key"]
-    id: str
+    text: str
+    directive: DecisionWebhookDirective
 
 
 class DecisionAnsweredWebhookEventPayload(TypedDict):
     decision_id: str
-    requested_at: str
-    resolved_at: str
-    answered_at: str | None
     outcome: DecisionWebhookOutcome
-    answered_via: DecisionWebhookAnsweredVia | None
-    answered_by: DecisionWebhookAnsweredBy | None
-    answer: DecisionWebhookAnswer | None
+    answered_via: NotRequired[DecisionWebhookAnsweredVia]
+    answered_by: NotRequired[str]
+    answer: NotRequired[DecisionWebhookAnswer]
 
 
 class AgentDecisionRequestedPayload(DecisionRequestedWebhookEventPayload):
