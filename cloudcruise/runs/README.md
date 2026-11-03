@@ -121,6 +121,39 @@ def maybe_submit_input(event):
 handle.on("run.event", maybe_submit_input)
 ```
 
+### Decision Required
+
+When the recovery agent needs a person to decide, a webhook subscribed to `agent.decision_requested` receives the question. Answer it by POSTing to the payload's `respond_url` with your API key in `cc-key`. See [Answer a decision](https://docs.cloudcruise.com/run-api/answer-a-decision).
+
+```python
+import os
+
+import requests
+from cloudcruise import AgentDecisionRequestedPayload
+from cloudcruise.webhook import verify_signature
+
+
+def handle_webhook(raw_body: bytes, signature: str) -> None:
+    message = verify_signature(raw_body, signature, "webhook-secret")
+    if message.event != "agent.decision_requested":
+        return
+    decision: AgentDecisionRequestedPayload = message.payload
+    field = decision["fields"][0]
+    response = requests.post(
+        decision["respond_url"],
+        headers={"cc-key": os.environ["CLOUDCRUISE_API_KEY"]},
+        json={
+            "decision_id": decision["decision_id"],
+            "values": {field["id"]: field["options"][0]["id"]},
+            "text": "Use the existing record.",
+        },
+        timeout=30,
+    )
+    # 200: accepted, the run resumes. 404: already answered, expired or cancelled. 409: answered elsewhere at the same moment.
+```
+
+`values` is keyed by field `id`, using the option `id` for choice fields. Send at least one of `values`, `text` or `directive` (`requeue`, `add_error_code`, `fail`). The outcome arrives as `agent.decision_answered`.
+
 ### Advanced Options
 
 ```python
@@ -220,6 +253,8 @@ handle.on("execution.start", lambda e: print(e.payload))
 - `screenshot.uploaded` – Screenshot captured
 - `file.uploaded` – File uploaded
 - `agent.error_analysis` – Error analysis completed
+- `agent.decision_requested` – The recovery agent asked a person to decide
+- `agent.decision_answered` – That decision was answered, declined, expired, cancelled or failed
 
 See `cloudcruise/runs/types.py` (`EventType`) and `cloudcruise/events/types.py` for complete type definitions and payload structures.
 

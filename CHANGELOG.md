@@ -8,7 +8,7 @@
 
 ### Removed (breaking)
 
-- `execution.input_required` is gone from the API, so it is gone here too: the `execution.input_required` event type, `ExecutionInputRequiredPayload`, `PopupContext`, `AvailableAction`, `PopupRetry`, and the `runs` helpers `submit_modal_action`, `submit_input_variables`, `on_popup_decision_required` and `on_input_variables_required` (the `/run/{session_id}/new_input_variables` endpoint they called no longer exists). Consequential popups are reported through `agent.decision_requested` / `agent.decision_answered` and answered at the event's `respond_url`.
+- `execution.input_required` is gone from the API, so it is gone here too: the `execution.input_required` event type, `ExecutionInputRequiredPayload`, `PopupContext`, `AvailableAction`, `PopupRetry`, and the `runs` helpers `submit_modal_action`, `submit_input_variables`, `on_popup_decision_required` and `on_input_variables_required` (the `/run/{session_id}/new_input_variables` endpoint they called no longer exists). Consequential popups are reported through `agent.decision_requested` / `agent.decision_answered` and answered at the event's `respond_url`; `cloudcruise/runs/README.md` (Decision Required) shows a handler that answers one.
 
 ## 1.4.1
 
