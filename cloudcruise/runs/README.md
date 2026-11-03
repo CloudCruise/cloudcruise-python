@@ -138,15 +138,14 @@ def handle_webhook(raw_body: bytes, signature: str) -> None:
     if message.event != "agent.decision_requested":
         return
     decision: AgentDecisionRequestedPayload = message.payload
-    field = decision["fields"][0]
+    choice = next((field for field in decision["fields"] if field.get("options")), None)
+    answer = {"decision_id": decision["decision_id"], "text": "Use the existing record."}
+    if choice:
+        answer["values"] = {choice["id"]: choice["options"][0]["id"]}
     response = requests.post(
         decision["respond_url"],
         headers={"cc-key": os.environ["CLOUDCRUISE_API_KEY"]},
-        json={
-            "decision_id": decision["decision_id"],
-            "values": {field["id"]: field["options"][0]["id"]},
-            "text": "Use the existing record.",
-        },
+        json=answer,
         timeout=30,
     )
     # 200: accepted, the run resumes. 404: already answered, expired or cancelled. 409: answered elsewhere at the same moment.
