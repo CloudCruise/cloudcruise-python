@@ -65,11 +65,6 @@ from .runs.types import (
 )
 
 from .events.types import (
-    ExecutionPasswordRecoveryPayload,
-    ExecutionPasswordUpdatedPayload,
-    RecoveryErrorCategory,
-    RecoveryWebhookEventPayload,
-    AgentRecoveryPayload,
     DecisionWebhookOutcome,
     DecisionWebhookAnsweredVia,
     DecisionWebhookDirective,
@@ -147,13 +142,7 @@ __all__ = [
     "ScreenshotUploadedPayload",
     "EventWebhookMessage",
     "RunEventMessage",
-    # Modal Recovery Types
-    # Recovery and Decision Required Types
-    "ExecutionPasswordRecoveryPayload",
-    "ExecutionPasswordUpdatedPayload",
-    "RecoveryErrorCategory",
-    "RecoveryWebhookEventPayload",
-    "AgentRecoveryPayload",
+    # Decision Required Types
     "DecisionWebhookOutcome",
     "DecisionWebhookAnsweredVia",
     "DecisionWebhookDirective",

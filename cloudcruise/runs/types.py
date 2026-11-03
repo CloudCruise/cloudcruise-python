@@ -38,12 +38,8 @@ EventType = Literal[
     "interaction.finished",
     "interaction.failed",
     "agent.error_analysis",
-    "agent.recovery",
-    "agent.tfa_setup_recovery",
     "agent.decision_requested",
     "agent.decision_answered",
-    "execution.password_recovery",
-    "execution.password_updated",
 ]
 
 

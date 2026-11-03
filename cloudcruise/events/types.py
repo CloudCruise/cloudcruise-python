@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Generic, List, Literal, TypeVar, Union
 
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 # Re-use EventType from runs.types to avoid circular imports
 # We'll import it later after updating runs/types.py
@@ -80,45 +80,6 @@ class AgentErrorAnalysisPayload(TypedDict, total=False):
     popup_signature: str  # optional
 
 
-class ExecutionPasswordRecoveryPayload(TypedDict, total=False):
-    session_id: str
-    workflow_id: str
-    phase: Literal["started", "analyzing_form", "submitting", "verifying", "resuming", "completed", "failed"]
-    message: str
-    resume_mode: Literal["login", "original_node"]  # optional
-
-
-class ExecutionPasswordUpdatedPayload(TypedDict):
-    session_id: str
-    workflow_id: str
-
-
-RecoveryErrorCategory = Literal[
-    "XPATH_INCORRECT",
-    "INCORRECT_INPUTS",
-    "UNEXPECTED_UI_STATE",
-    "AUTHENTICATION_ERROR",
-    "PASSWORD_UPDATE_REQUIRED",
-    "PAGE_STILL_LOADING",
-    "SERVICE_UNAVAILABLE",
-    "NOT_CONFIDENT",
-    "INTERNAL_ERROR",
-    "IGNORE_ERROR",
-]
-
-
-class RecoveryWebhookEventPayload(TypedDict):
-    category: RecoveryErrorCategory
-    subType: str | None
-    outcome: Literal["resume", "requeue", "fail"]
-    resumeNodeTitle: str | None
-
-
-class AgentRecoveryPayload(RecoveryWebhookEventPayload):
-    session_id: str
-    workflow_id: str
-
-
 DecisionWebhookOutcome = Literal["answered", "declined", "expired", "cancelled", "failed"]
 
 DecisionWebhookAnsweredVia = Literal["slack", "web", "api"]
@@ -128,25 +89,31 @@ DecisionWebhookDirective = Literal["requeue", "add_error_code", "fail"]
 DecisionWebhookFieldValue = str | int | float | bool | list[str]
 
 
-class DecisionWebhookOption(TypedDict):
+class _DecisionWebhookOptionRequired(TypedDict):
     id: str
     label: str
-    note: NotRequired[str]
 
 
-class DecisionWebhookField(TypedDict):
+class DecisionWebhookOption(_DecisionWebhookOptionRequired, total=False):
+    note: str
+
+
+class _DecisionWebhookFieldRequired(TypedDict):
     id: str
     label: str
     type: str
-    options: NotRequired[list[DecisionWebhookOption]]
-    required: NotRequired[Literal[False]]
-    min: NotRequired[float]
-    max: NotRequired[float]
-    placeholder: NotRequired[str]
-    hint: NotRequired[str]
 
 
-class DecisionRequestedWebhookEventPayload(TypedDict):
+class DecisionWebhookField(_DecisionWebhookFieldRequired, total=False):
+    options: list[DecisionWebhookOption]
+    required: Literal[False]
+    min: float
+    max: float
+    placeholder: str
+    hint: str
+
+
+class _DecisionRequestedWebhookEventPayloadRequired(TypedDict):
     decision_id: str
     answer_by: str
     question: str
@@ -154,8 +121,11 @@ class DecisionRequestedWebhookEventPayload(TypedDict):
     fields: list[DecisionWebhookField]
     free_text: bool
     respond_url: str
-    signed_screenshot_url: NotRequired[str]
-    signed_screenshot_url_expires: NotRequired[str]
+
+
+class DecisionRequestedWebhookEventPayload(_DecisionRequestedWebhookEventPayloadRequired, total=False):
+    signed_screenshot_url: str
+    signed_screenshot_url_expires: str
 
 
 class DecisionWebhookAnswer(TypedDict, total=False):
@@ -164,12 +134,15 @@ class DecisionWebhookAnswer(TypedDict, total=False):
     directive: DecisionWebhookDirective
 
 
-class DecisionAnsweredWebhookEventPayload(TypedDict):
+class _DecisionAnsweredWebhookEventPayloadRequired(TypedDict):
     decision_id: str
     outcome: DecisionWebhookOutcome
-    answered_via: NotRequired[DecisionWebhookAnsweredVia]
-    answered_by: NotRequired[str]
-    answer: NotRequired[DecisionWebhookAnswer]
+
+
+class DecisionAnsweredWebhookEventPayload(_DecisionAnsweredWebhookEventPayloadRequired, total=False):
+    answered_via: DecisionWebhookAnsweredVia
+    answered_by: str
+    answer: DecisionWebhookAnswer
 
 
 class AgentDecisionRequestedPayload(DecisionRequestedWebhookEventPayload):

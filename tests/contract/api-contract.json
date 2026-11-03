@@ -1,0 +1,247 @@
+{
+  "source": "https://docs.cloudcruise.com/run-api/run-api.yaml",
+  "paths": [
+    "/live/sessions/{session_id}/connection",
+    "/run",
+    "/run/{session_id}",
+    "/run/{session_id}/debug-snapshots/{node_id}",
+    "/run/{session_id}/decision/respond",
+    "/run/{session_id}/interrupt",
+    "/run/{session_id}/network",
+    "/run/{session_id}/user_interaction",
+    "/runs",
+    "/runs/unpause",
+    "/runs/workflow/{workflow_id}/errors"
+  ],
+  "webhooks": [
+    "agent.decision_answered",
+    "agent.decision_requested"
+  ],
+  "subscribable_events": [
+    "agent.decision_answered",
+    "agent.decision_requested",
+    "execution.failed",
+    "execution.password_updated",
+    "execution.paused",
+    "execution.queued",
+    "execution.requeued",
+    "execution.start",
+    "execution.step",
+    "execution.stopped",
+    "execution.success",
+    "file.uploaded",
+    "interaction.failed",
+    "interaction.finished",
+    "interaction.waiting",
+    "screenshot.uploaded",
+    "video.uploaded"
+  ],
+  "decision_requested": {
+    "type": "object",
+    "required": [
+      "session_id",
+      "workflow_id",
+      "decision_id",
+      "answer_by",
+      "question",
+      "context",
+      "fields",
+      "free_text",
+      "respond_url"
+    ],
+    "properties": {
+      "session_id": {
+        "type": "string"
+      },
+      "workflow_id": {
+        "type": "string"
+      },
+      "decision_id": {
+        "type": "string"
+      },
+      "answer_by": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "question": {
+        "type": "string"
+      },
+      "context": {
+        "type": "string"
+      },
+      "fields": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "label",
+            "type"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "single_choice",
+                "multi_choice",
+                "dropdown",
+                "date",
+                "time",
+                "datetime",
+                "text",
+                "number",
+                "confirm"
+              ]
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "label"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "required": {
+              "type": "boolean",
+              "enum": [
+                false
+              ]
+            },
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "placeholder": {
+              "type": "string"
+            },
+            "hint": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "free_text": {
+        "type": "boolean"
+      },
+      "respond_url": {
+        "type": "string"
+      },
+      "signed_screenshot_url": {
+        "type": "string"
+      },
+      "signed_screenshot_url_expires": {
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  },
+  "decision_answered": {
+    "type": "object",
+    "required": [
+      "session_id",
+      "workflow_id",
+      "decision_id",
+      "outcome"
+    ],
+    "properties": {
+      "session_id": {
+        "type": "string"
+      },
+      "workflow_id": {
+        "type": "string"
+      },
+      "decision_id": {
+        "type": "string"
+      },
+      "outcome": {
+        "type": "string",
+        "enum": [
+          "answered",
+          "declined",
+          "expired",
+          "cancelled",
+          "failed"
+        ]
+      },
+      "answered_via": {
+        "type": "string",
+        "enum": [
+          "slack",
+          "web",
+          "api"
+        ]
+      },
+      "answered_by": {
+        "type": "string"
+      },
+      "answer": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "text": {
+            "type": "string"
+          },
+          "directive": {
+            "type": "string",
+            "enum": [
+              "requeue",
+              "add_error_code",
+              "fail"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "decision_respond_request": {
+    "type": "object",
+    "required": [
+      "decision_id"
+    ],
+    "properties": {
+      "decision_id": {
+        "type": "string"
+      },
+      "values": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "text": {
+        "type": "string",
+        "maxLength": 2000
+      },
+      "directive": {
+        "type": "string",
+        "enum": [
+          "requeue",
+          "add_error_code",
+          "fail"
+        ]
+      }
+    }
+  }
+}

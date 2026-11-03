@@ -5,18 +5,14 @@ from cloudcruise import EventType
 
 
 class TestEventTypes(unittest.TestCase):
-    def test_event_type_lists_every_event_the_api_sends_including_recovery_and_decision_required(self):
+    def test_event_type_lists_the_decision_required_events_and_not_the_removed_execution_input_required(self):
         self.assertEqual(
             sorted(get_args(EventType)),
             [
                 "agent.decision_answered",
                 "agent.decision_requested",
                 "agent.error_analysis",
-                "agent.recovery",
-                "agent.tfa_setup_recovery",
                 "execution.failed",
-                "execution.password_recovery",
-                "execution.password_updated",
                 "execution.paused",
                 "execution.queued",
                 "execution.requeued",
