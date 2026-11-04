@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Generic, List, Literal, TypeVar, Union
+from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar, Union
 
 from typing_extensions import TypedDict
 
@@ -165,6 +165,21 @@ class _DecisionRequestedWebhookEventPayloadRequired(TypedDict):
 class DecisionRequestedWebhookEventPayload(_DecisionRequestedWebhookEventPayloadRequired, total=False):
     signed_screenshot_url: str
     signed_screenshot_url_expires: str
+
+
+class PendingDecision(TypedDict):
+    decision_id: str
+    answer_by: str
+    question: str
+    context: str
+    fields: list[DecisionWebhookField]
+    free_text: bool
+    respond_url: str
+
+
+class PendingDecisionResponse(TypedDict):
+    decision: Optional[PendingDecision]
+    answered_decision_id: Optional[str]
 
 
 class DecisionWebhookAnswer(TypedDict, total=False):

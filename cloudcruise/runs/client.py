@@ -31,7 +31,7 @@ def _verbose_log(operation: str, message: str) -> None:
     except Exception:
         pass
 
-from ..events.types import DecisionWebhookAnswer
+from ..events.types import DecisionWebhookAnswer, PendingDecisionResponse
 from ..utils.async_queue import AsyncEventQueue
 from ..utils.events import SimpleEventEmitter
 from ..utils.connection_manager import ConnectionManager, SessionSubscription
@@ -288,6 +288,26 @@ class RunsClient:
     def submit_user_interaction(self, session_id: str, data: UserInteractionData) -> None:
         path = f"/run/{session_id}/user_interaction"
         self._make_request("POST", path, data)
+
+    def get_pending_decision(self, session_id: str) -> PendingDecisionResponse:
+        """
+        Read the decision the recovery agent is waiting on for a run (Decision
+        Required), in the shape of the agent.decision_requested event:
+        decision_id, answer_by, question, context, fields with their ids and
+        options, free_text and respond_url.
+
+        ``decision`` is None when nothing is pending, and
+        ``answered_decision_id`` is set when a decision on this run was already
+        answered. Only reads runs in the key's own workspace.
+
+        Args:
+            session_id: The session that asked the decision.
+
+        Returns:
+            ``{"decision": {...} | None, "answered_decision_id": str | None}``
+        """
+        path = f"/run/{session_id}/decision/pending"
+        return self._make_request("GET", path)
 
     def respond_to_decision(
         self, session_id: str, decision_id: str, answer: DecisionWebhookAnswer

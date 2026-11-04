@@ -40,5 +40,33 @@ class TestRespondToDecision(unittest.TestCase):
             self.assertIn(key, accepted)
 
 
+class TestGetPendingDecision(unittest.TestCase):
+    def test_reads_the_runs_pending_decision_and_returns_the_api_response_unchanged(self):
+        response = {
+            "decision": {
+                "decision_id": "dec-1",
+                "answer_by": "2026-11-04T20:00:00.000Z",
+                "question": "Which record should be kept?",
+                "context": "Two matching records",
+                "fields": [
+                    {"id": "choice", "label": "Record", "type": "single_choice", "options": [{"id": "keep", "label": "Keep"}]}
+                ],
+                "free_text": True,
+                "respond_url": "https://api.example.test/run/sess-1/decision/respond",
+            },
+            "answered_decision_id": None,
+        }
+        client = make_client(response)
+        result = client.get_pending_decision("sess-1")
+        client._make_request.assert_called_once_with("GET", "/run/sess-1/decision/pending")  # type: ignore[attr-defined]
+        self.assertEqual(result, response)
+
+    def test_passes_through_a_run_with_nothing_pending_and_the_id_of_an_answered_decision(self):
+        client = make_client({"decision": None, "answered_decision_id": "dec-1"})
+        self.assertEqual(
+            client.get_pending_decision("sess-1"), {"decision": None, "answered_decision_id": "dec-1"}
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
