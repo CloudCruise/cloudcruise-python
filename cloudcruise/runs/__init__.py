@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from ..events.types import DecisionWebhookAnswer
 from .types import *  # re-export types for convenience
 
 def _client():
@@ -35,6 +36,7 @@ __all__ = [
     "start",
     "subscribe_to_session",
     "submit_user_interaction",
+    "respond_to_decision",
     "submit_modal_action",
     "submit_input_variables",
     "on_popup_decision_required",
@@ -55,6 +57,10 @@ def subscribe_to_session(session_id: str, options: Optional[RunStreamOptions] = 
 
 def submit_user_interaction(session_id: str, data: UserInteractionData) -> None:
     return _client().runs.submit_user_interaction(session_id, data)
+
+
+def respond_to_decision(session_id: str, decision_id: str, answer: DecisionWebhookAnswer) -> Dict[str, Any]:
+    return _client().runs.respond_to_decision(session_id, decision_id, answer)
 
 
 def submit_modal_action(session_id: str, action_id: str) -> None:

@@ -31,6 +31,7 @@ def _verbose_log(operation: str, message: str) -> None:
     except Exception:
         pass
 
+from ..events.types import DecisionWebhookAnswer
 from ..utils.async_queue import AsyncEventQueue
 from ..utils.events import SimpleEventEmitter
 from ..utils.connection_manager import ConnectionManager, SessionSubscription
@@ -287,6 +288,30 @@ class RunsClient:
     def submit_user_interaction(self, session_id: str, data: UserInteractionData) -> None:
         path = f"/run/{session_id}/user_interaction"
         self._make_request("POST", path, data)
+
+    def respond_to_decision(
+        self, session_id: str, decision_id: str, answer: DecisionWebhookAnswer
+    ) -> Dict[str, Any]:
+        """
+        Answer a question the recovery agent asked during a run (Decision
+        Required). The agent.decision_requested event carries the decision_id
+        and the fields; answer them by id in ``values``, using the option id
+        for choice fields. Send at least one of values, text or directive.
+
+        The first accepted answer from the API, Slack or the dashboard resolves
+        the decision. The endpoint returns 404 once the decision is answered,
+        expired or cancelled, and only accepts runs in the key's own workspace.
+
+        Args:
+            session_id: The session that asked the decision.
+            decision_id: The decision_id from agent.decision_requested.
+            answer: The answer: values, text and/or directive.
+
+        Returns:
+            ``{"status": "accepted", "decision_id": ...}``
+        """
+        path = f"/run/{session_id}/decision/respond"
+        return self._make_request("POST", path, {"decision_id": decision_id, **answer})
 
     def submit_modal_action(self, session_id: str, action_id: str) -> None:
         """
