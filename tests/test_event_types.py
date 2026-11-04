@@ -7,7 +7,7 @@ from cloudcruise import EventType
 
 
 class TestEventTypes(unittest.TestCase):
-    def test_event_type_lists_the_decision_required_events_and_not_the_removed_execution_input_required(self):
+    def test_event_type_lists_the_decision_required_events_and_the_deprecated_execution_input_required(self):
         self.assertEqual(
             sorted(get_args(EventType)),
             [
@@ -15,6 +15,7 @@ class TestEventTypes(unittest.TestCase):
                 "agent.decision_requested",
                 "agent.error_analysis",
                 "execution.failed",
+                "execution.input_required",
                 "execution.paused",
                 "execution.queued",
                 "execution.requeued",

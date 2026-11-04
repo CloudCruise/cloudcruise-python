@@ -80,6 +80,45 @@ class AgentErrorAnalysisPayload(TypedDict, total=False):
     popup_signature: str  # optional
 
 
+# === Non-dismissible modal recovery types ===
+# When a workflow click is blocked by a modal the worker cannot dismiss on its
+# own, the backend emits an execution.input_required event with reason set to
+# "non_dismissible_popup" and a popup_context block carrying the visible CTA
+# buttons (available_actions) plus a per-session retry counter. Customers
+# respond by calling client.runs.submit_modal_action(session_id, action_id).
+class AvailableAction(TypedDict):
+    id: str
+    label: str
+
+
+class PopupRetry(TypedDict):
+    attempt: int
+    max_attempts: int
+
+
+class PopupContext(TypedDict, total=False):
+    error_description: str
+    error_sub_type: str  # optional ("NON_DISMISSIBLE")
+    full_url: str  # optional
+    available_actions: List["AvailableAction"]
+    retry: "PopupRetry"
+
+
+class ExecutionInputRequiredPayload(TypedDict, total=False):
+    """Deprecated: the API no longer sends ``execution.input_required``. Use ``AgentDecisionRequestedPayload``."""
+
+    session_id: str
+    input_variables: Dict[str, Any]
+    screenshot_url: str  # optional
+    # Discriminator for which recovery path is requesting input:
+    # - "input_required": missing or invalid workflow variable
+    # - "incorrect_form_input": form rejected the typed value
+    # - "multiple_matching_results": extractor needs disambiguation
+    # - "non_dismissible_popup": modal CTA needs to be picked (popup_context set)
+    reason: str  # optional
+    popup_context: "PopupContext"  # optional, present iff reason == "non_dismissible_popup"
+
+
 DecisionWebhookOutcome = Literal["answered", "declined", "expired", "cancelled", "failed"]
 
 DecisionWebhookAnsweredVia = Literal["slack", "web", "api"]

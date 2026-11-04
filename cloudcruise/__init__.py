@@ -64,6 +64,14 @@ from .runs.types import (
     RunEventMessage,
 )
 
+# Modal recovery types (execution.input_required + non_dismissible_popup)
+from .events.types import (
+    AvailableAction,
+    PopupRetry,
+    PopupContext,
+    ExecutionInputRequiredPayload,
+)
+
 from .events.types import (
     DecisionWebhookOutcome,
     DecisionWebhookAnsweredVia,
@@ -142,6 +150,11 @@ __all__ = [
     "ScreenshotUploadedPayload",
     "EventWebhookMessage",
     "RunEventMessage",
+    # Modal Recovery Types (deprecated)
+    "AvailableAction",
+    "PopupRetry",
+    "PopupContext",
+    "ExecutionInputRequiredPayload",
     # Decision Required Types
     "DecisionWebhookOutcome",
     "DecisionWebhookAnsweredVia",

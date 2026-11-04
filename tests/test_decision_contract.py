@@ -33,16 +33,15 @@ class TestDecisionRequiredMatchesTheApiContract(unittest.TestCase):
             f"{typed_dict.__name__} required keys",
         )
 
-    def test_both_decision_required_events_are_in_event_type_and_subscribable_in_the_api_and_input_required_is_gone_from_both(self):
+    def test_both_decision_required_events_are_in_event_type_and_subscribable_in_the_api_and_the_api_no_longer_offers_input_required(self):
         sdk_events = get_args(EventType)
         for event in ("agent.decision_requested", "agent.decision_answered"):
             self.assertIn(event, sdk_events)
             self.assertIn(event, CONTRACT["subscribable_events"])
             self.assertIn(event, CONTRACT["webhooks"])
-        self.assertNotIn("execution.input_required", sdk_events)
         self.assertNotIn("execution.input_required", CONTRACT["subscribable_events"])
 
-    def test_the_api_serves_the_decision_answer_endpoint_and_no_longer_serves_new_input_variables_which_the_removed_runs_helpers_called(self):
+    def test_the_api_serves_the_decision_answer_endpoint_and_no_longer_serves_new_input_variables_which_the_deprecated_runs_helpers_call(self):
         self.assertIn("/run/{session_id}/decision/respond", CONTRACT["paths"])
         self.assertNotIn("/run/{session_id}/new_input_variables", CONTRACT["paths"])
 
