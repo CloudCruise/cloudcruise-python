@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Generic, List, Literal, TypeVar, Union
+from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar, Union
 
 from typing_extensions import TypedDict
 
@@ -105,6 +105,8 @@ class PopupContext(TypedDict, total=False):
 
 
 class ExecutionInputRequiredPayload(TypedDict, total=False):
+    """Deprecated: the API no longer sends ``execution.input_required``. Use ``AgentDecisionRequestedPayload``."""
+
     session_id: str
     input_variables: Dict[str, Any]
     screenshot_url: str  # optional
@@ -115,6 +117,96 @@ class ExecutionInputRequiredPayload(TypedDict, total=False):
     # - "non_dismissible_popup": modal CTA needs to be picked (popup_context set)
     reason: str  # optional
     popup_context: "PopupContext"  # optional, present iff reason == "non_dismissible_popup"
+
+
+DecisionWebhookOutcome = Literal["answered", "declined", "expired", "cancelled", "failed"]
+
+DecisionWebhookAnsweredVia = Literal["slack", "web", "api"]
+
+DecisionWebhookDirective = Literal["requeue", "add_error_code", "fail"]
+
+DecisionWebhookFieldValue = str | int | float | bool | list[str]
+
+
+class _DecisionWebhookOptionRequired(TypedDict):
+    id: str
+    label: str
+
+
+class DecisionWebhookOption(_DecisionWebhookOptionRequired, total=False):
+    note: str
+
+
+class _DecisionWebhookFieldRequired(TypedDict):
+    id: str
+    label: str
+    type: str
+
+
+class DecisionWebhookField(_DecisionWebhookFieldRequired, total=False):
+    options: list[DecisionWebhookOption]
+    required: Literal[False]
+    min: float
+    max: float
+    placeholder: str
+    hint: str
+
+
+class _DecisionRequestedWebhookEventPayloadRequired(TypedDict):
+    decision_id: str
+    answer_by: str
+    question: str
+    context: str
+    fields: list[DecisionWebhookField]
+    free_text: bool
+    respond_url: str
+
+
+class DecisionRequestedWebhookEventPayload(_DecisionRequestedWebhookEventPayloadRequired, total=False):
+    signed_screenshot_url: str
+    signed_screenshot_url_expires: str
+
+
+class PendingDecision(TypedDict):
+    decision_id: str
+    answer_by: str
+    question: str
+    context: str
+    fields: list[DecisionWebhookField]
+    free_text: bool
+    respond_url: str
+
+
+class PendingDecisionResponse(TypedDict):
+    decision: Optional[PendingDecision]
+    answered_decision_id: Optional[str]
+
+
+class DecisionWebhookAnswer(TypedDict, total=False):
+    values: dict[str, DecisionWebhookFieldValue]
+    text: str
+    directive: DecisionWebhookDirective
+
+
+class _DecisionAnsweredWebhookEventPayloadRequired(TypedDict):
+    decision_id: str
+    outcome: DecisionWebhookOutcome
+
+
+class DecisionAnsweredWebhookEventPayload(_DecisionAnsweredWebhookEventPayloadRequired, total=False):
+    answered_via: DecisionWebhookAnsweredVia
+    answered_by: str
+    answer: DecisionWebhookAnswer
+
+
+class AgentDecisionRequestedPayload(DecisionRequestedWebhookEventPayload):
+    session_id: str
+    workflow_id: str
+
+
+class AgentDecisionAnsweredPayload(DecisionAnsweredWebhookEventPayload):
+    session_id: str
+    workflow_id: str
 
 
 class ExecutionRequeuedPayload(TypedDict, total=False):

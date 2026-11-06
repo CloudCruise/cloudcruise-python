@@ -39,6 +39,8 @@ EventType = Literal[
     "interaction.finished",
     "interaction.failed",
     "agent.error_analysis",
+    "agent.decision_requested",
+    "agent.decision_answered",
 ]
 
 
