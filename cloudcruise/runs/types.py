@@ -74,6 +74,12 @@ class StartRunRequest:
     webhook: Optional[PayloadWebhook] = None
     additional_context: Optional[Dict[str, Any]] = None
     client_id: Optional[str] = None
+    # Give at most one of workflow_version and workflow_branch_id; with
+    # neither, the head of the workflow's default branch runs.
+    # An exact semver ("2.1.0") or a range ("^2.1.0").
+    workflow_version: Optional[str] = None
+    # Run the latest version on this branch (branch id).
+    workflow_branch_id: Optional[str] = None
 
 
 @dataclass
@@ -150,6 +156,13 @@ class RunResult:
     screenshot_urls: List[ScreenshotUrl] = field(default_factory=list)
     errors: Optional[List[RunError]] = None
     workflow_id: Optional[str] = None
+    # The exact workflow version this run executed.
+    workflow_version_id: Optional[str] = None
+    # The branch the run was started on: the branch it was pinned to, or the
+    # default branch for an unpinned run. None for a version-pinned run, a run
+    # from before branches were recorded, or a deleted branch.
+    workflow_branch_id: Optional[str] = None
+    workflow_branch_name: Optional[str] = None
 
 
 @dataclass
