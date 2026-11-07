@@ -47,6 +47,12 @@ def decrypt_data(encrypted_hex: str, key_hex: str) -> Any:
         raise RuntimeError(f"Decryption failed: {str(e)}")
 
 
+def _required(item: Any, key: str, path: str) -> Any:
+    if not isinstance(item, dict) or item.get(key) is None:
+        raise ValueError(f"{path}.{key} is required")
+    return item[key]
+
+
 def encrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict[str, Any]:
     encrypted = dict(entry)
     if entry.get("user_name") is not None:
@@ -57,16 +63,24 @@ def encrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict
         encrypted["tfa_secret"] = encrypt_data(entry["tfa_secret"], encryption_key)
     if isinstance(entry.get("additional_fields"), list):
         encrypted["additional_fields"] = [
-            {**field, "value": encrypt_data(field["value"], encryption_key)}
-            for field in entry["additional_fields"]
+            {
+                "name": _required(field, "name", f"additional_fields[{i}]"),
+                "type": _required(field, "type", f"additional_fields[{i}]"),
+                "value": encrypt_data(
+                    _required(field, "value", f"additional_fields[{i}]"), encryption_key
+                ),
+            }
+            for i, field in enumerate(entry["additional_fields"])
         ]
     if isinstance(entry.get("security_questions"), list):
         encrypted["security_questions"] = [
             {
-                "question": encrypt_data(item["question"], encryption_key),
-                "answer": encrypt_data(item["answer"], encryption_key),
+                key: encrypt_data(
+                    _required(item, key, f"security_questions[{i}]"), encryption_key
+                )
+                for key in ("question", "answer")
             }
-            for item in entry["security_questions"]
+            for i, item in enumerate(entry["security_questions"])
         ]
     # proxy_value is meaningless to the backend without proxy_setting, which is
     # also the discriminator that decides whether to encrypt. Fail closed so a
@@ -94,24 +108,9 @@ def _decrypt_or_keep(value: Any, encryption_key: str) -> Any:
 
 def decrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict[str, Any]:
     decrypted = dict(entry)
-    val = entry.get("user_name")
-    if isinstance(val, str):
-        try:
-            decrypted["user_name"] = decrypt_data(val, encryption_key)
-        except Exception:
-            pass
-    val = entry.get("password")
-    if isinstance(val, str):
-        try:
-            decrypted["password"] = decrypt_data(val, encryption_key)
-        except Exception:
-            pass
-    val = entry.get("tfa_secret")
-    if isinstance(val, str):
-        try:
-            decrypted["tfa_secret"] = decrypt_data(val, encryption_key)
-        except Exception:
-            pass
+    for key in ("user_name", "password", "tfa_secret"):
+        if key in entry:
+            decrypted[key] = _decrypt_or_keep(entry[key], encryption_key)
     if isinstance(entry.get("additional_fields"), list):
         decrypted["additional_fields"] = [
             {**field, "value": _decrypt_or_keep(field.get("value"), encryption_key)}
@@ -130,11 +129,6 @@ def decrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict
             else item
             for item in entry["security_questions"]
         ]
-    if entry.get("proxy_setting") == "custom":
-        val = entry.get("proxy_value")
-        if isinstance(val, str):
-            try:
-                decrypted["proxy_value"] = decrypt_data(val, encryption_key)
-            except Exception:
-                pass
+    if entry.get("proxy_setting") == "custom" and "proxy_value" in entry:
+        decrypted["proxy_value"] = _decrypt_or_keep(entry["proxy_value"], encryption_key)
     return decrypted

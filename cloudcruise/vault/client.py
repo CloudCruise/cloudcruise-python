@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import asdict, fields as _dc_fields
 from typing import Any, Dict, List, Optional
 from .types import (
@@ -21,19 +22,21 @@ _VAULT_ENTRY_FIELDS = {f.name for f in _dc_fields(VaultEntry)}
 _PROXY_FIELDS = {f.name for f in _dc_fields(ProxyConfig)}
 _TFA_CODE_FIELDS = {f.name for f in _dc_fields(VaultTfaCode)}
 _NESTED_LIST_TYPES = {
-    "additional_fields": VaultAdditionalField,
-    "additional_field_warnings": VaultAdditionalFieldWarning,
-    "security_questions": VaultSecurityQuestion,
-    "security_question_warnings": VaultSecurityQuestionWarning,
+    key: (cls, tuple(f.name for f in _dc_fields(cls)))
+    for key, cls in (
+        ("additional_fields", VaultAdditionalField),
+        ("additional_field_warnings", VaultAdditionalFieldWarning),
+        ("security_questions", VaultSecurityQuestion),
+        ("security_question_warnings", VaultSecurityQuestionWarning),
+    )
 }
 
 
-def _to_dataclass_list(cls: Any, items: Any) -> Any:
+def _to_dataclass_list(cls: Any, names: tuple, items: Any) -> Any:
     if not isinstance(items, list):
         return items
-    names = {f.name for f in _dc_fields(cls)}
     return [
-        cls(**{k: v for k, v in item.items() if k in names})
+        cls(**{name: item.get(name) for name in names})
         if isinstance(item, dict)
         else item
         for item in items
@@ -55,6 +58,13 @@ def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
     proxy = payload.get("proxy")
     if isinstance(proxy, dict):
         payload["proxy"] = {k: v for k, v in proxy.items() if v is not None}
+    if "tfa_method" in payload:
+        warnings.warn(
+            "tfa_method is deprecated: set tfa_methods. "
+            "The API ignores tfa_method when tfa_methods is set.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
     _validate_provider_payload(payload)
     return payload
 
@@ -103,9 +113,9 @@ def _to_vault_entry(data: Dict[str, Any]) -> VaultEntry:
         known["proxy"] = ProxyConfig(
             **{k: v for k, v in proxy.items() if k in _PROXY_FIELDS}
         )
-    for key, cls in _NESTED_LIST_TYPES.items():
+    for key, (cls, names) in _NESTED_LIST_TYPES.items():
         if key in known:
-            known[key] = _to_dataclass_list(cls, known[key])
+            known[key] = _to_dataclass_list(cls, names, known[key])
     return VaultEntry(**known)
 
 
@@ -192,22 +202,25 @@ class VaultClient:
         - email: the most recently received code (within the freshness window),
           with ``received_at``.
 
-        SMS and magic-link codes are not supported (the endpoint returns 409). The code is returned with ``Cache-Control: no-store`` and should
-        not be logged or cached.
+        SMS and magic-link codes are not supported (the endpoint returns 409).
+        The code is returned with ``Cache-Control: no-store`` and should not be
+        logged or cached.
         """
         if not permissioned_user_id:
             raise ValueError("permissioned_user_id is required to get a TFA code")
         if not domain:
             raise ValueError("domain is required to get a TFA code")
+        if field is not None and method not in (None, "AUTHENTICATOR"):
+            raise ValueError("field requires method AUTHENTICATOR or no method")
         from urllib.parse import urlencode
 
         params: Dict[str, str] = {
             "permissioned_user_id": permissioned_user_id,
             "domain": domain,
         }
-        if method:
+        if method is not None:
             params["method"] = method
-        if field:
+        if field is not None:
             params["field"] = field
         qs = urlencode(params)
         response = self._make_request("GET", f"/vault/tfa-code?{qs}")

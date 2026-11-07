@@ -91,7 +91,7 @@ tfa = client.vault.get_tfa_code("user123", "https://example.com")
 # Entry with several 2FA methods: pick one
 client.vault.get_tfa_code("user123", "https://example.com", method="EMAIL")
 
-# Code of a Totp additional field instead of the built-in seed
+# Code of a Totp additional field instead of the built-in seed (implies AUTHENTICATOR)
 client.vault.get_tfa_code("user123", "https://example.com", field="Backup authenticator")
 ```
 
@@ -134,9 +134,13 @@ client.vault.create(
 
 Field types: `Text`, `Email`, `Url`, `Phone`, `Date`, `MonthYear`, `Address`,
 `Concealed`, `Totp`. `tfa_method` is deprecated; it reads as the first of
-`tfa_methods`. Entries bound to a secret provider take additional fields and
-security questions from the bound item and report skipped ones in
-`additional_field_warnings` and `security_question_warnings`.
+`tfa_methods`. Writing it emits a `DeprecationWarning`; the API ignores it when
+`tfa_methods` is set and otherwise replaces the stored methods with it.
+
+Entries bound to a secret provider take additional fields and security
+questions from the bound item. `get()` with both `domain` and
+`permissioned_user_id` reports skipped ones in `additional_field_warnings` and
+`security_question_warnings` when there are any.
 
 ### Provider-Backed Credentials
 

@@ -1,4 +1,5 @@
 import unittest
+import warnings
 
 from cloudcruise import (
     GetVaultEntriesFilters,
@@ -6,6 +7,7 @@ from cloudcruise import (
     VaultAdditionalFieldWarning,
     VaultEntryInput,
     VaultSecurityQuestion,
+    VaultEntry,
     VaultSecurityQuestionWarning,
 )
 from cloudcruise.vault.client import VaultClient
@@ -79,6 +81,35 @@ class TestVaultAdditionalFields(unittest.TestCase):
         self.assertEqual(result.additional_fields, ADDITIONAL_FIELDS)
 
 
+    def test_create_sends_only_name_type_and_value_of_an_additional_field(self):
+        """The API rejects unknown keys on an additional field with 400, so
+        extra keys a caller carries on a dict (e.g. a UI id) are not sent."""
+        server = EchoServer()
+        VaultClient(server, KEY).create(
+            VaultEntryInput(
+                domain="example.com",
+                permissioned_user_id="user123",
+                additional_fields=[{"id": 7, "name": "Note", "type": "Text", "value": "x"}],
+            )
+        )
+        self.assertEqual(
+            set(server.calls[0][2]["additional_fields"][0]), {"name", "type", "value"}
+        )
+
+    def test_create_names_the_additional_field_that_lacks_a_value(self):
+        """An item without a value cannot be encrypted; the error says which
+        item and key are missing instead of a bare KeyError."""
+        client = VaultClient(EchoServer(), KEY)
+        with self.assertRaisesRegex(ValueError, r"additional_fields\[0\]\.value is required"):
+            client.create(
+                VaultEntryInput(
+                    domain="example.com",
+                    permissioned_user_id="user123",
+                    additional_fields=[{"name": "Note", "type": "Text"}],
+                )
+            )
+
+
 class TestVaultSecurityQuestions(unittest.TestCase):
     def test_create_sends_questions_and_answers_encrypted_in_order_and_returns_them_decrypted(self):
         """The API stores both the question and the answer encrypted and
@@ -106,6 +137,60 @@ class TestVaultSecurityQuestions(unittest.TestCase):
             self.assertEqual(decrypt_data(sent_item["question"], KEY), item.question)
             self.assertEqual(decrypt_data(sent_item["answer"], KEY), item.answer)
         self.assertEqual(result.security_questions, questions)
+
+    def test_create_names_the_security_question_that_lacks_an_answer(self):
+        """A question without an answer cannot be encrypted; the error says
+        which item and key are missing instead of a bare KeyError."""
+        client = VaultClient(EchoServer(), KEY)
+        with self.assertRaisesRegex(ValueError, r"security_questions\[1\]\.answer is required"):
+            client.create(
+                VaultEntryInput(
+                    domain="example.com",
+                    permissioned_user_id="user123",
+                    security_questions=[
+                        {"question": "Pet?", "answer": "Rex"},
+                        {"question": "Colour?"},
+                    ],
+                )
+            )
+
+
+class TestVaultPositionalArguments(unittest.TestCase):
+    def test_existing_positional_arguments_keep_their_fields(self):
+        """The new fields come after every existing field, so constructors
+        called positionally before they existed still fill the same fields."""
+        entry_input = VaultEntryInput(
+            "example.com", "u1", None, "alice", "pw", None, None, None, "seed", "EMAIL", "agent"
+        )
+        self.assertEqual(entry_input.tfa_method, "EMAIL")
+        self.assertEqual(entry_input.user_agent, "agent")
+        self.assertIsNone(entry_input.tfa_methods)
+
+        entry = VaultEntry(
+            "example.com", "u1", "id1", None, None, None, None, None, None,
+            None, None, None, "seed", "EMAIL", "tfa@example.com",
+        )
+        self.assertEqual(entry.tfa_method, "EMAIL")
+        self.assertEqual(entry.tfa_email, "tfa@example.com")
+        self.assertIsNone(entry.tfa_methods)
+
+
+class TestVaultTfaMethodDeprecation(unittest.TestCase):
+    def test_writing_tfa_method_warns_that_it_is_deprecated(self):
+        """The API ignores tfa_method when tfa_methods is sent and otherwise
+        replaces the whole list with it, so writing it warns callers to move
+        to tfa_methods."""
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            VaultClient(EchoServer(), KEY).create(
+                VaultEntryInput(
+                    domain="example.com", permissioned_user_id="u1", tfa_method="EMAIL"
+                )
+            )
+        self.assertTrue(
+            any(issubclass(w.category, DeprecationWarning) and "tfa_methods" in str(w.message)
+                for w in caught)
+        )
 
 
 class TestVaultProviderBackedLists(unittest.TestCase):
@@ -204,6 +289,20 @@ class TestVaultRead(unittest.TestCase):
             [VaultSecurityQuestionWarning(question="Long?", reason="question_too_long")],
         )
 
+    def test_get_keeps_an_entry_whose_list_item_lacks_a_key(self):
+        """A list item missing a key must not fail the whole read; the key
+        reads as None, like any other absent field of the entry."""
+        response = {
+            "domain": "example.com",
+            "permissioned_user_id": "user123",
+            "additional_field_warnings": [{"name": "Dup"}],
+        }
+        [entry] = VaultClient(EchoServer(response=[response]), KEY).get()
+        self.assertEqual(
+            entry.additional_field_warnings,
+            [VaultAdditionalFieldWarning(name="Dup", reason=None)],
+        )
+
     def test_get_without_decryption_returns_lists_as_ciphertext(self):
         """decryptCredentials=False promises the raw API values, so the
         encrypted lists stay ciphertext too."""
@@ -285,6 +384,23 @@ class TestVaultTfaCode(unittest.TestCase):
             "/vault/tfa-code?permissioned_user_id=user123&domain=example.com",
         )
         self.assertEqual(code.code, "123456")
+
+    def test_get_tfa_code_rejects_field_with_a_method_other_than_authenticator(self):
+        """A Totp field is an authenticator seed, so the API always answers
+        400 for field with another method; the SDK fails before sending."""
+        server = EchoServer(response=self.CODE)
+        with self.assertRaisesRegex(ValueError, "field requires method AUTHENTICATOR"):
+            VaultClient(server, KEY).get_tfa_code(
+                "user123", "example.com", method="EMAIL", field="Backup authenticator"
+            )
+        self.assertEqual(server.calls, [])
+
+    def test_get_tfa_code_sends_an_empty_field_instead_of_dropping_it(self):
+        """Dropping an empty field would silently return the built-in seed's
+        code; sending it lets the API reject the unknown field."""
+        server = EchoServer(response=self.CODE)
+        VaultClient(server, KEY).get_tfa_code("user123", "example.com", field="")
+        self.assertTrue(server.calls[0][1].endswith("&field="))
 
 
 if __name__ == "__main__":

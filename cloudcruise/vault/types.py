@@ -75,7 +75,9 @@ class ProxyConfig:
 class VaultEntryInput:
     """Fields a client can set when creating or updating a vault entry.
 
-    ``tfa_methods`` replaces the deprecated ``tfa_method``.
+    ``tfa_methods`` replaces the deprecated ``tfa_method``. The API ignores
+    ``tfa_method`` when ``tfa_methods`` is set; on its own it replaces the
+    stored methods with that single method.
     ``additional_fields`` and ``security_questions`` replace the stored lists.
 
     Omits server-managed fields (``id``, ``created_at``, ``workspace_id``,
@@ -94,10 +96,7 @@ class VaultEntryInput:
     secret_ref: Optional[str] = None
     secret_cache_ttl_seconds: Optional[int] = None
     tfa_secret: Optional[str] = None
-    tfa_methods: Optional[List[TfaMethod]] = None
     tfa_method: Optional[TfaMethod] = None
-    additional_fields: Optional[List[VaultAdditionalField]] = None
-    security_questions: Optional[List[VaultSecurityQuestion]] = None
     user_agent: Optional[str] = None
     user_alias: Optional[str] = None
     location: Optional[str] = None
@@ -120,6 +119,9 @@ class VaultEntryInput:
     proxy_value: Optional[str] = None
     expiry_time_from_last_use: Optional[str] = None
     expiry_time_from_session_data_set: Optional[str] = None
+    tfa_methods: Optional[List[TfaMethod]] = None
+    additional_fields: Optional[List[VaultAdditionalField]] = None
+    security_questions: Optional[List[VaultSecurityQuestion]] = None
 
 
 @dataclass
@@ -149,7 +151,6 @@ class VaultEntry:
     secret_ref: Optional[str] = None
     secret_cache_ttl_seconds: Optional[int] = None
     tfa_secret: Optional[str] = None
-    tfa_methods: Optional[List[TfaMethod]] = None
     tfa_method: Optional[TfaMethod] = None
     tfa_email: Optional[str] = None
     tfa_phone_number: Optional[str] = None
@@ -178,6 +179,7 @@ class VaultEntry:
     session_data_set_at: Optional[str] = None
     effective_expires_at: Optional[str] = None
     created_at: Optional[str] = None
+    tfa_methods: Optional[List[TfaMethod]] = None
     additional_fields: Optional[List[VaultAdditionalField]] = None
     additional_field_warnings: Optional[List[VaultAdditionalFieldWarning]] = None
     security_questions: Optional[List[VaultSecurityQuestion]] = None
