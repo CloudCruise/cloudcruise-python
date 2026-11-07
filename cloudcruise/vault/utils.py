@@ -55,6 +55,19 @@ def encrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict
         encrypted["password"] = encrypt_data(entry["password"], encryption_key)
     if entry.get("tfa_secret") is not None:
         encrypted["tfa_secret"] = encrypt_data(entry["tfa_secret"], encryption_key)
+    if isinstance(entry.get("additional_fields"), list):
+        encrypted["additional_fields"] = [
+            {**field, "value": encrypt_data(field["value"], encryption_key)}
+            for field in entry["additional_fields"]
+        ]
+    if isinstance(entry.get("security_questions"), list):
+        encrypted["security_questions"] = [
+            {
+                "question": encrypt_data(item["question"], encryption_key),
+                "answer": encrypt_data(item["answer"], encryption_key),
+            }
+            for item in entry["security_questions"]
+        ]
     # proxy_value is meaningless to the backend without proxy_setting, which is
     # also the discriminator that decides whether to encrypt. Fail closed so a
     # custom proxy URL (often with embedded credentials) is never sent in
@@ -68,6 +81,15 @@ def encrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict
     if entry.get("proxy_setting") == "custom" and entry.get("proxy_value") is not None:
         encrypted["proxy_value"] = encrypt_data(entry["proxy_value"], encryption_key)
     return encrypted
+
+
+def _decrypt_or_keep(value: Any, encryption_key: str) -> Any:
+    if not isinstance(value, str):
+        return value
+    try:
+        return decrypt_data(value, encryption_key)
+    except Exception:
+        return value
 
 
 def decrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict[str, Any]:
@@ -90,6 +112,24 @@ def decrypt_sensitive_fields(entry: Dict[str, Any], encryption_key: str) -> Dict
             decrypted["tfa_secret"] = decrypt_data(val, encryption_key)
         except Exception:
             pass
+    if isinstance(entry.get("additional_fields"), list):
+        decrypted["additional_fields"] = [
+            {**field, "value": _decrypt_or_keep(field.get("value"), encryption_key)}
+            if isinstance(field, dict)
+            else field
+            for field in entry["additional_fields"]
+        ]
+    if isinstance(entry.get("security_questions"), list):
+        decrypted["security_questions"] = [
+            {
+                **item,
+                "question": _decrypt_or_keep(item.get("question"), encryption_key),
+                "answer": _decrypt_or_keep(item.get("answer"), encryption_key),
+            }
+            if isinstance(item, dict)
+            else item
+            for item in entry["security_questions"]
+        ]
     if entry.get("proxy_setting") == "custom":
         val = entry.get("proxy_value")
         if isinstance(val, str):

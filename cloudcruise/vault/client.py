@@ -5,8 +5,13 @@ from typing import Any, Dict, List, Optional
 from .types import (
     GetVaultEntriesFilters,
     ProxyConfig,
+    TfaMethod,
+    VaultAdditionalField,
+    VaultAdditionalFieldWarning,
     VaultEntry,
     VaultEntryInput,
+    VaultSecurityQuestion,
+    VaultSecurityQuestionWarning,
     VaultTfaCode,
 )
 from .utils import decrypt_sensitive_fields, encrypt_sensitive_fields
@@ -15,6 +20,24 @@ from .utils import decrypt_sensitive_fields, encrypt_sensitive_fields
 _VAULT_ENTRY_FIELDS = {f.name for f in _dc_fields(VaultEntry)}
 _PROXY_FIELDS = {f.name for f in _dc_fields(ProxyConfig)}
 _TFA_CODE_FIELDS = {f.name for f in _dc_fields(VaultTfaCode)}
+_NESTED_LIST_TYPES = {
+    "additional_fields": VaultAdditionalField,
+    "additional_field_warnings": VaultAdditionalFieldWarning,
+    "security_questions": VaultSecurityQuestion,
+    "security_question_warnings": VaultSecurityQuestionWarning,
+}
+
+
+def _to_dataclass_list(cls: Any, items: Any) -> Any:
+    if not isinstance(items, list):
+        return items
+    names = {f.name for f in _dc_fields(cls)}
+    return [
+        cls(**{k: v for k, v in item.items() if k in names})
+        if isinstance(item, dict)
+        else item
+        for item in items
+    ]
 
 
 def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
@@ -54,6 +77,11 @@ def _validate_provider_payload(payload: Dict[str, Any]) -> None:
     if has_provider_id:
         direct_secret_fields = ("user_name", "password", "tfa_secret")
         conflicts = [field for field in direct_secret_fields if field in payload]
+        conflicts += [
+            field
+            for field in ("additional_fields", "security_questions")
+            if payload.get(field)
+        ]
         if conflicts:
             raise ValueError(
                 "provider-backed vault entries cannot include "
@@ -75,6 +103,9 @@ def _to_vault_entry(data: Dict[str, Any]) -> VaultEntry:
         known["proxy"] = ProxyConfig(
             **{k: v for k, v in proxy.items() if k in _PROXY_FIELDS}
         )
+    for key, cls in _NESTED_LIST_TYPES.items():
+        if key in known:
+            known[key] = _to_dataclass_list(cls, known[key])
     return VaultEntry(**known)
 
 
@@ -86,7 +117,8 @@ class VaultClient:
     def create(self, entry: VaultEntryInput) -> VaultEntry:
         """Create a vault entry.
 
-        Sensitive fields (``user_name``, ``password``, ``tfa_secret``) are
+        Sensitive fields (``user_name``, ``password``, ``tfa_secret``, every
+        additional field value, every security question and answer) are
         encrypted client-side before transport and decrypted on the response.
         """
         payload = _input_to_payload(entry)
@@ -142,16 +174,25 @@ class VaultClient:
             raise ValueError("permissioned_user_id is required to delete a vault entry")
         self._make_request("DELETE", "/vault", params)
 
-    def get_tfa_code(self, permissioned_user_id: str, domain: str) -> VaultTfaCode:
+    def get_tfa_code(
+        self,
+        permissioned_user_id: str,
+        domain: str,
+        method: Optional[TfaMethod] = None,
+        field: Optional[str] = None,
+    ) -> VaultTfaCode:
         """Get the current 2FA code for a single vault entry.
 
-        The code is auto-detected by the credential's 2FA method:
+        ``method`` picks the 2FA method and is required when the entry has
+        several ``tfa_methods``. ``field`` names a ``Totp`` additional field
+        whose code to return instead of the built-in seed's.
+
+        The code depends on the method:
         - authenticator: a freshly generated TOTP, with ``expires_in_seconds``.
         - email: the most recently received code (within the freshness window),
           with ``received_at``.
 
-        SMS and magic-link credentials are not supported (the endpoint returns
-        409). The code is returned with ``Cache-Control: no-store`` and should
+        SMS and magic-link codes are not supported (the endpoint returns 409). The code is returned with ``Cache-Control: no-store`` and should
         not be logged or cached.
         """
         if not permissioned_user_id:
@@ -160,9 +201,15 @@ class VaultClient:
             raise ValueError("domain is required to get a TFA code")
         from urllib.parse import urlencode
 
-        qs = urlencode(
-            {"permissioned_user_id": permissioned_user_id, "domain": domain}
-        )
+        params: Dict[str, str] = {
+            "permissioned_user_id": permissioned_user_id,
+            "domain": domain,
+        }
+        if method:
+            params["method"] = method
+        if field:
+            params["field"] = field
+        qs = urlencode(params)
         response = self._make_request("GET", f"/vault/tfa-code?{qs}")
         known = {k: v for k, v in response.items() if k in _TFA_CODE_FIELDS}
         return VaultTfaCode(**known)

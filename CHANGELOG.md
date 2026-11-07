@@ -4,12 +4,15 @@
 
 ### Added
 
+- Vault entries carry `additional_fields` (`VaultAdditionalField`, nine types incl. `Address` and `Totp`), `security_questions` (`VaultSecurityQuestion`) and `tfa_methods`. The SDK encrypts every additional field value and every security question and answer before sending and decrypts them on read. Provider-backed entries return `additional_field_warnings` and `security_question_warnings`; sending non-empty `additional_fields` or `security_questions` with a provider binding raises `ValueError`. Requires CloudCruise/monorepo#12158.
+- `client.vault.get_tfa_code(permissioned_user_id, domain, method=None, field=None)` picks the 2FA method of an entry with several, or the `Totp` additional field to read.
 - Decision Required events `agent.decision_requested` and `agent.decision_answered`, typed as `AgentDecisionRequestedPayload` and `AgentDecisionAnsweredPayload`. `agent.decision_requested` carries `decision_id`, `answer_by` (the decision deadline), `question`, `context`, `fields` (ids, labels, types, options), `free_text`, `respond_url` (POST the answer there) and, when available, `signed_screenshot_url` / `signed_screenshot_url_expires`; `agent.decision_answered` carries `outcome` (`answered`, `declined`, `expired`, `cancelled`, `failed`) and, when someone answered, `answered_via`, `answered_by` and `answer` (`values`, `text`, `directive`). Session and workflow ids come first, the run's metadata is in the envelope, and optional keys are omitted rather than null.
 - `client.runs.get_pending_decision(session_id)` reads the decision a run is waiting on, in the shape of `agent.decision_requested` (`{"decision", "answered_decision_id"}`), through `GET /run/{session_id}/decision/pending`. That route ships with CloudCruise/monorepo#12130; until it is deployed the call answers 404.
 - `client.runs.respond_to_decision(session_id, decision_id, answer)` answers a decision through `POST /run/{session_id}/decision/respond`, with the answer typed as `DecisionWebhookAnswer`.
 
 ### Deprecated
 
+- `tfa_method` on `VaultEntryInput` and `VaultEntry`. Use `tfa_methods`; `tfa_method` reads as its first entry.
 - `execution.input_required` is no longer sent by the API, and `POST /run/{session_id}/new_input_variables` no longer exists. The `execution.input_required` event type, `ExecutionInputRequiredPayload`, `PopupContext`, `AvailableAction`, `PopupRetry` and the `runs` helpers `submit_modal_action`, `submit_input_variables`, `on_popup_decision_required` and `on_input_variables_required` stay importable so existing code keeps running, and the helpers emit a `DeprecationWarning`: the submit helpers get an error response and the listeners never fire. Consequential popups arrive as `agent.decision_requested`; answer them at the event's `respond_url` (see `cloudcruise/runs/README.md`, Decision Required). They will be removed in 2.0.0.
 
 ## 1.4.1

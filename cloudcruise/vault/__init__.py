@@ -9,6 +9,12 @@ from .types import (
     ProxyConfig,
     TfaMethod,
     VaultTfaCode,
+    VaultFieldType,
+    VaultAddress,
+    VaultAdditionalField,
+    VaultAdditionalFieldWarning,
+    VaultSecurityQuestion,
+    VaultSecurityQuestionWarning,
 )
 
 def _client():
@@ -23,6 +29,12 @@ __all__ = [
     "ProxyConfig",
     "TfaMethod",
     "VaultTfaCode",
+    "VaultFieldType",
+    "VaultAddress",
+    "VaultAdditionalField",
+    "VaultAdditionalFieldWarning",
+    "VaultSecurityQuestion",
+    "VaultSecurityQuestionWarning",
     # Convenience APIs
     "create",
     "get",
@@ -48,5 +60,10 @@ def delete(params: Dict[str, str]) -> None:
     return _client().vault.delete(params)
 
 
-def get_tfa_code(permissioned_user_id: str, domain: str) -> VaultTfaCode:
-    return _client().vault.get_tfa_code(permissioned_user_id, domain)
+def get_tfa_code(
+    permissioned_user_id: str,
+    domain: str,
+    method: Optional[TfaMethod] = None,
+    field: Optional[str] = None,
+) -> VaultTfaCode:
+    return _client().vault.get_tfa_code(permissioned_user_id, domain, method, field)
