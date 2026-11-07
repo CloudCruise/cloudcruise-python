@@ -7,6 +7,12 @@ from .vault.types import (
     ProxyConfig,
     TfaMethod,
     VaultTfaCode,
+    VaultFieldType,
+    VaultAddress,
+    VaultAdditionalField,
+    VaultAdditionalFieldWarning,
+    VaultSecurityQuestion,
+    VaultSecurityQuestionWarning,
 )
 
 from .secret_providers.types import (
@@ -103,6 +109,12 @@ __all__ = [
     "ProxyConfig",
     "TfaMethod",
     "VaultTfaCode",
+    "VaultFieldType",
+    "VaultAddress",
+    "VaultAdditionalField",
+    "VaultAdditionalFieldWarning",
+    "VaultSecurityQuestion",
+    "VaultSecurityQuestionWarning",
     # Secret Provider Types
     "SecretProvider",
     "SecretProviderItem",
