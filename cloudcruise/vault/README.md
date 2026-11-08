@@ -29,8 +29,7 @@ client = CloudCruise(
 # create the client with `client = CloudCruise()`.
 
 # Create a vault entry
-# Sensitive values (user_name, password, tfa_secret, additional field values,
-# security questions and answers) are encrypted before transport.
+# Sensitive values (user_name, password, tfa_secret) are encrypted before transport.
 entry = client.vault.create(
     VaultEntryInput(
         domain="https://example.com",
@@ -97,10 +96,6 @@ client.vault.get_tfa_code("user123", "https://example.com", field="Backup authen
 
 ### Additional Fields, 2FA Methods and Security Questions
 
-Every additional field `value` and every security question and answer is
-encrypted client-side, like `password`. Both lists replace the stored lists on
-`create` and `update`.
-
 ```python
 from cloudcruise import VaultAdditionalField, VaultSecurityQuestion
 
@@ -110,37 +105,16 @@ client.vault.create(
         permissioned_user_id="user123",
         user_name="john_doe",
         password="secure_password",
-        tfa_secret="JBSWY3DPEHPK3PXP",
         tfa_methods=["AUTHENTICATOR", "EMAIL"],
-        additional_fields=[
-            VaultAdditionalField(name="Member ID", type="Text", value="A-1029"),
-            VaultAdditionalField(
-                name="Backup authenticator",
-                type="Totp",
-                value="JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
-            ),
-            VaultAdditionalField(
-                name="Billing address",
-                type="Address",
-                value={"street": "1 Main St", "city": "Springfield", "state": "IL", "zip": "62701", "country": "US"},
-            ),
-        ],
-        security_questions=[
-            VaultSecurityQuestion(question="What was your first pet called?", answer="Rex"),
-        ],
+        additional_fields=[VaultAdditionalField(name="Member ID", type="Text", value="A-1029")],
+        security_questions=[VaultSecurityQuestion(question="What was your first pet called?", answer="Rex")],
     )
 )
 ```
 
-Field types: `Text`, `Email`, `Url`, `Phone`, `Date`, `MonthYear`, `Address`,
-`Concealed`, `Totp`. `tfa_method` is deprecated; it reads as the first of
-`tfa_methods`. Writing it emits a `DeprecationWarning`; the API ignores it when
-`tfa_methods` is set and otherwise replaces the stored methods with it.
-
-Entries bound to a secret provider take additional fields and security
-questions from the bound item. `get()` with both `domain` and
-`permissioned_user_id` reports skipped ones in `additional_field_warnings` and
-`security_question_warnings` when there are any.
+Field values, questions and answers are encrypted client-side. Each list replaces
+the stored one. `tfa_method` is deprecated in favour of `tfa_methods`. Field
+types and limits: [Additional fields](https://docs.cloudcruise.com/concepts/vault#additional-fields).
 
 ### Provider-Backed Credentials
 
