@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 import warnings
 from dataclasses import asdict, fields as _dc_fields
 from typing import Any, Dict, List, Optional
@@ -18,6 +20,7 @@ from .types import (
 from .utils import decrypt_sensitive_fields, encrypt_sensitive_fields
 
 
+_PACKAGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep
 _VAULT_ENTRY_FIELDS = {f.name for f in _dc_fields(VaultEntry)}
 _PROXY_FIELDS = {f.name for f in _dc_fields(ProxyConfig)}
 _TFA_CODE_FIELDS = {f.name for f in _dc_fields(VaultTfaCode)}
@@ -43,6 +46,17 @@ def _to_dataclass_list(cls: Any, names: tuple, items: Any) -> Any:
     ]
 
 
+def _caller_stacklevel() -> int:
+    """Stack level of the first frame outside the cloudcruise package,
+    counted from the function that calls this one."""
+    level = 1
+    frame = sys._getframe(1)
+    while frame is not None and frame.f_code.co_filename.startswith(_PACKAGE_DIR):
+        frame = frame.f_back
+        level += 1
+    return level
+
+
 def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
     """Convert a :class:`VaultEntryInput` to a request dict, dropping
     ``None`` values so we don't send nulls the backend neither needs nor
@@ -63,7 +77,7 @@ def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
             "tfa_method is deprecated: set tfa_methods. "
             "The API ignores tfa_method when tfa_methods is set.",
             DeprecationWarning,
-            stacklevel=3,
+            stacklevel=_caller_stacklevel(),
         )
     _validate_provider_payload(payload)
     return payload

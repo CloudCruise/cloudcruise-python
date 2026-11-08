@@ -1,5 +1,11 @@
 import unittest
 import warnings
+from types import SimpleNamespace
+from unittest import mock
+
+import cloudcruise
+import cloudcruise._default
+import cloudcruise.vault
 
 from cloudcruise import (
     GetVaultEntriesFilters,
@@ -191,6 +197,27 @@ class TestVaultTfaMethodDeprecation(unittest.TestCase):
             any(issubclass(w.category, DeprecationWarning) and "tfa_methods" in str(w.message)
                 for w in caught)
         )
+
+    def test_tfa_method_warning_is_attributed_to_the_callers_file_on_every_entry_point(self):
+        """Python's default filters show a DeprecationWarning only when it is
+        attributed to __main__, so the warning must point at the caller's line,
+        never at an SDK file, whether the caller uses a client or the
+        module-level cloudcruise.vault functions."""
+        client = VaultClient(EchoServer(), KEY)
+        entry = VaultEntryInput(domain="example.com", permissioned_user_id="u1", tfa_method="EMAIL")
+        entry_points = {
+            "client.create": lambda: client.create(entry),
+            "client.update": lambda: client.update(entry),
+            "cloudcruise.vault.create": lambda: cloudcruise.vault.create(entry),
+            "cloudcruise.vault.update": lambda: cloudcruise.vault.update(entry),
+        }
+        with mock.patch.object(cloudcruise._default, "_default_client", SimpleNamespace(vault=client)):
+            for name, call in entry_points.items():
+                with self.subTest(name), warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always")
+                    call()
+                    [warning] = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+                    self.assertEqual(warning.filename, __file__)
 
 
 class TestVaultProviderBackedLists(unittest.TestCase):
