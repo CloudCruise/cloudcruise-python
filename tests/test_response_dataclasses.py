@@ -6,6 +6,7 @@ from cloudcruise.runs.types import (
     FlattenedRunEvent,
     LiveViewConnection,
     RunResult,
+    StartRunRequest,
     VideoUrl,
     WebhookEvent,
     WebhookReplayResponse,
@@ -188,6 +189,24 @@ class TestRunDataclassResponses(unittest.TestCase):
         self.assertIsInstance(result.video_urls[0], VideoUrl)
         self.assertFalse(hasattr(result, "unknown"))
 
+    def test_get_results_keeps_the_version_and_branch_the_run_used(self):
+        client = RunsClient(
+            _FakeConnectionManager(),
+            lambda *_: {
+                "session_id": "session-1",
+                "status": "execution.success",
+                "workflow_version_id": "version-1",
+                "workflow_branch_id": "branch-1",
+                "workflow_branch_name": "fix-login",
+            },
+        )
+
+        result = client.get_results("session-1")
+
+        self.assertEqual(result.workflow_version_id, "version-1")
+        self.assertEqual(result.workflow_branch_id, "branch-1")
+        self.assertEqual(result.workflow_branch_name, "fix-login")
+
     def test_replay_webhooks_returns_nested_dataclasses(self):
         client = RunsClient(
             _FakeConnectionManager(),
@@ -309,6 +328,26 @@ class TestRunDataclassResponses(unittest.TestCase):
         client.start({"workflow_id": "wf-1"})
 
         self.assertEqual(captured["body"]["run_input_variables"], {})
+
+    def test_start_dataclass_sends_the_branch_pin(self):
+        captured = {}
+
+        def make_request(method, path, body=None):
+            captured["body"] = body
+            return {"session_id": "session-1"}
+
+        client = RunsClient(_FakeConnectionManager(), make_request)
+
+        client.start(
+            StartRunRequest(
+                workflow_id="wf-1",
+                run_input_variables={},
+                workflow_branch_id="branch-1",
+            )
+        )
+
+        self.assertEqual(captured["body"]["workflow_branch_id"], "branch-1")
+        self.assertIsNone(captured["body"]["workflow_version"])
 
 
 if __name__ == "__main__":
