@@ -81,12 +81,40 @@ client.vault.delete(
     }
 )
 
-# Get the current 2FA code for an entry (auto-detected by the credential's 2FA method)
+# Get the current 2FA code for an entry with one 2FA method
 tfa = client.vault.get_tfa_code("user123", "https://example.com")
 # authenticator -> VaultTfaCode(type="authenticator", code="123456", expires_in_seconds=23)
 # email         -> VaultTfaCode(type="email", code="884512", received_at="...")
-# (SMS and magic-link credentials are not supported.)
+# (SMS and magic-link codes are not supported.)
+
+# Entry with several 2FA methods: pick one
+client.vault.get_tfa_code("user123", "https://example.com", method="EMAIL")
+
+# Code of a Totp additional field instead of the built-in seed (implies AUTHENTICATOR)
+client.vault.get_tfa_code("user123", "https://example.com", field="Backup authenticator")
 ```
+
+### Additional Fields, 2FA Methods and Security Questions
+
+```python
+from cloudcruise import VaultAdditionalField, VaultSecurityQuestion
+
+client.vault.create(
+    VaultEntryInput(
+        domain="https://example.com",
+        permissioned_user_id="user123",
+        user_name="john_doe",
+        password="secure_password",
+        tfa_methods=["AUTHENTICATOR", "EMAIL"],
+        additional_fields=[VaultAdditionalField(name="Member ID", type="Text", value="A-1029")],
+        security_questions=[VaultSecurityQuestion(question="What was your first pet called?", answer="Rex")],
+    )
+)
+```
+
+Field values, questions and answers are encrypted client-side. Each list replaces
+the stored one. `tfa_method` is deprecated in favour of `tfa_methods`. Field
+types and limits: [Additional fields](https://docs.cloudcruise.com/concepts/vault#additional-fields).
 
 ### Provider-Backed Credentials
 
@@ -118,7 +146,7 @@ entry = client.vault.create(
         user_name="john_doe",
         password="secure_password",
         tfa_secret="JBSWY3DPEHPK3PXP",
-        tfa_method="AUTHENTICATOR",
+        tfa_methods=["AUTHENTICATOR"],
         user_alias="Production Account",
         allow_multiple_sessions=False,
         # Browser state persistence
@@ -155,6 +183,7 @@ API docs:
 - [Get Vault Entries](https://docs.cloudcruise.com/vault-api/get-vault-entries.md)
 - [Update Vault Entry](https://docs.cloudcruise.com/vault-api/update-vault-entry.md)
 - [Delete Vault Entry](https://docs.cloudcruise.com/vault-api/delete-vault-entry.md)
+- [Get 2FA Code](https://docs.cloudcruise.com/vault-api/get-vault-tfa-code.md)
 
 SDK capabilities may evolve with the API; consult the docs for the latest
 support matrix.

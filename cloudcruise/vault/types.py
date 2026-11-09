@@ -1,10 +1,68 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Optional
+from typing import Any, List, Literal, Optional, TypedDict, Union
 
 
 TfaMethod = Literal["AUTHENTICATOR", "EMAIL", "SMS", "MAGIC_LINK"]
+
+VaultFieldType = Literal[
+    "Text",
+    "Email",
+    "Url",
+    "Phone",
+    "Date",
+    "MonthYear",
+    "Address",
+    "Concealed",
+    "Totp",
+]
+
+
+class VaultAddress(TypedDict):
+    street: str
+    city: str
+    state: str
+    zip: str
+    country: str
+
+
+@dataclass
+class VaultAdditionalField:
+    """A named, typed value on a vault entry.
+
+    ``value`` is a :class:`VaultAddress` dict only for ``Address``. Workflows
+    read it as ``{{context.inputs.<ALIAS>.FIELDS.<name>}}``.
+    """
+
+    name: str
+    type: VaultFieldType
+    value: Union[str, VaultAddress]
+
+
+@dataclass
+class VaultAdditionalFieldWarning:
+    """An additional field of the bound secret provider item that was skipped."""
+
+    name: str
+    reason: str
+
+
+@dataclass
+class VaultSecurityQuestion:
+    """A security question and its answer, answered by a
+    ``SECURITY_QUESTION`` TFA node."""
+
+    question: str
+    answer: str
+
+
+@dataclass
+class VaultSecurityQuestionWarning:
+    """A security question of the bound secret provider item that was skipped."""
+
+    question: str
+    reason: str
 
 
 @dataclass
@@ -16,6 +74,11 @@ class ProxyConfig:
 @dataclass
 class VaultEntryInput:
     """Fields a client can set when creating or updating a vault entry.
+
+    ``tfa_methods`` replaces the deprecated ``tfa_method``. The API ignores
+    ``tfa_method`` when ``tfa_methods`` is set; on its own it replaces the
+    stored methods with that single method.
+    ``additional_fields`` and ``security_questions`` replace the stored lists.
 
     Omits server-managed fields (``id``, ``created_at``, ``workspace_id``,
     ``organization_id``, ``site_identifier``, ``session_data_set_at``,
@@ -56,6 +119,9 @@ class VaultEntryInput:
     proxy_value: Optional[str] = None
     expiry_time_from_last_use: Optional[str] = None
     expiry_time_from_session_data_set: Optional[str] = None
+    tfa_methods: Optional[List[TfaMethod]] = None
+    additional_fields: Optional[List[VaultAdditionalField]] = None
+    security_questions: Optional[List[VaultSecurityQuestion]] = None
 
 
 @dataclass
@@ -68,6 +134,8 @@ class VaultEntry:
     (``tfa_email``, ``tfa_phone_number``, ``session_data_set_at``,
     ``effective_expires_at``). Setting any of the latter on create/update
     requests has no effect; the server ignores them.
+
+    ``tfa_method`` is deprecated and reads as the first of ``tfa_methods``.
     """
 
     domain: str
@@ -111,6 +179,11 @@ class VaultEntry:
     session_data_set_at: Optional[str] = None
     effective_expires_at: Optional[str] = None
     created_at: Optional[str] = None
+    tfa_methods: Optional[List[TfaMethod]] = None
+    additional_fields: Optional[List[VaultAdditionalField]] = None
+    additional_field_warnings: Optional[List[VaultAdditionalFieldWarning]] = None
+    security_questions: Optional[List[VaultSecurityQuestion]] = None
+    security_question_warnings: Optional[List[VaultSecurityQuestionWarning]] = None
 
 
 @dataclass
