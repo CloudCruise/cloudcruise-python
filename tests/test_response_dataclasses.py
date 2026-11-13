@@ -50,6 +50,66 @@ class TestWorkflowDataclassResponses(unittest.TestCase):
         self.assertEqual(workflows[0].id, "wf-1")
         self.assertFalse(hasattr(workflows[0], "future_field"))
 
+    def test_get_all_workflows_reads_recovery_and_requeue_settings(self):
+        client = WorkflowsClient(
+            lambda *_: [
+                {
+                    "id": "wf-1",
+                    "name": "Workflow",
+                    "description": None,
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z",
+                    "workspace_id": "workspace-1",
+                    "created_by": "user-1",
+                    "enable_popup_handling": True,
+                    "enable_xpath_recovery": True,
+                    "enable_error_code_generation": False,
+                    "enable_service_unavailable_recovery": False,
+                    "enable_action_timing_recovery": True,
+                    "enable_password_update_recovery": True,
+                    "enable_decision_required_recovery": True,
+                    "decision_timeout_seconds": 120,
+                    "decision_mention_slack_ids": ["U123"],
+                    "allow_requeue": False,
+                    "deny_requeue_past_dry_run_marker": True,
+                }
+            ]
+        )
+
+        workflow = client.get_all_workflows()[0]
+
+        self.assertTrue(workflow.enable_password_update_recovery)
+        self.assertTrue(workflow.enable_decision_required_recovery)
+        self.assertEqual(workflow.decision_timeout_seconds, 120)
+        self.assertEqual(workflow.decision_mention_slack_ids, ["U123"])
+        self.assertFalse(workflow.allow_requeue)
+        self.assertTrue(workflow.deny_requeue_past_dry_run_marker)
+
+    def test_get_all_workflows_leaves_new_settings_none_when_the_api_omits_them(self):
+        client = WorkflowsClient(
+            lambda *_: [
+                {
+                    "id": "wf-1",
+                    "name": "Workflow",
+                    "description": None,
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z",
+                    "workspace_id": "workspace-1",
+                    "created_by": "user-1",
+                    "enable_popup_handling": True,
+                    "enable_xpath_recovery": True,
+                    "enable_error_code_generation": False,
+                    "enable_service_unavailable_recovery": False,
+                    "enable_action_timing_recovery": True,
+                }
+            ]
+        )
+
+        workflow = client.get_all_workflows()[0]
+
+        self.assertIsNone(workflow.enable_password_update_recovery)
+        self.assertIsNone(workflow.allow_requeue)
+
     def test_get_workflow_metadata_returns_complete_api_response(self):
         client = WorkflowsClient(
             lambda *_: {

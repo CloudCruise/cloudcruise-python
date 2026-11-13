@@ -18,6 +18,12 @@ class Workflow:
     enable_error_code_generation: bool
     enable_service_unavailable_recovery: bool
     enable_action_timing_recovery: bool
+    enable_password_update_recovery: Optional[bool] = None
+    enable_decision_required_recovery: Optional[bool] = None
+    decision_timeout_seconds: Optional[int] = None
+    decision_mention_slack_ids: Optional[List[str]] = None
+    allow_requeue: Optional[bool] = None
+    deny_requeue_past_dry_run_marker: Optional[bool] = None
 
 
 WorkflowPropertySchema = Union[str, List[str], Dict[str, Any]]

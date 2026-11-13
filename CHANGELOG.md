@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `Workflow` (returned by `client.workflows.get_all_workflows()`) includes the settings the API already returns: `enable_password_update_recovery`, `enable_decision_required_recovery`, `decision_timeout_seconds`, `decision_mention_slack_ids`, `allow_requeue` and `deny_requeue_past_dry_run_marker`. All default to `None`, so existing code that builds a `Workflow` still works, and a field the API omits stays `None`.
+
 ## 1.5.0
 
 ### Added
