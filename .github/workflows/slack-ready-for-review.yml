@@ -1,0 +1,167 @@
+name: Post ready-for-review PRs to Slack
+
+# Adding the ready-for-review label posts the PR to Slack. In a stack, the label means this PR and every
+# PR below it are ready: the PRs below get the label too, the message lists the stack bottom-up, and a
+# later label in the same stack replies in the stack's thread and also sends the reply to the channel.
+# Each PR in the stack gets a bot comment linking the thread; its hidden marker is how the next label
+# finds the thread.
+#
+# Runs on pull_request_target so fork PRs get the secret too. It never checks out PR code.
+#
+# Setup: SLACK_INTERNAL_BOT_TOKEN is the CloudCruise Internal bot token, the same value as the backend's
+# SLACK_API_TOKEN, so rotate both together. SLACK_REVIEW_CHANNEL_ID is a repo variable, and the bot must
+# be a member of that channel.
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  stack:
+    if: github.event.label.name == 'ready-for-review'
+    runs-on: ubuntu-latest
+    outputs:
+      chain: ${{ steps.walk.outputs.chain }}
+      bottom: ${{ steps.walk.outputs.bottom }}
+    steps:
+      - name: Walk down the stack
+        id: walk
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          # The PR below is the open same-repo PR whose head is this PR's base. Stop at the default branch
+          # or any protected branch, so a release PR (main -> production) never joins.
+          chain=("$PR_NUMBER")
+          base="$BASE_REF"
+          while [ "$base" != "$DEFAULT_BRANCH" ] && [ "${#chain[@]}" -lt 20 ]; do
+            protected=$(gh api "repos/$REPO/branches/$base" --jq .protected 2>/dev/null || echo true)
+            [ "$protected" = "false" ] || break
+            read -r below below_base < <(gh pr list -R "$REPO" --head "$base" --state open \
+              --json number,baseRefName,isCrossRepository \
+              --jq 'map(select(.isCrossRepository | not)) | .[0] // empty | "\(.number) \(.baseRefName)"') || break
+            chain=("$below" "${chain[@]}")
+            base="$below_base"
+          done
+          echo "Stack, bottom first: ${chain[*]}"
+          echo "chain=${chain[*]}" >> "$GITHUB_OUTPUT"
+          echo "bottom=${chain[0]}" >> "$GITHUB_OUTPUT"
+
+  notify:
+    needs: stack
+    runs-on: ubuntu-latest
+    # One queue per stack keeps a stack in one thread. queue: max keeps every pending run instead of only
+    # the newest, so no label is dropped.
+    concurrency:
+      group: slack-ready-for-review-${{ needs.stack.outputs.bottom }}
+      queue: max
+    steps:
+      - name: Post to Slack
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHAIN: ${{ needs.stack.outputs.chain }}
+          LABEL: ready-for-review
+          SLACK_TOKEN: ${{ secrets.SLACK_INTERNAL_BOT_TOKEN }}
+          CHANNEL: ${{ vars.SLACK_REVIEW_CHANNEL_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_TOKEN:-}" ] || [ -z "${CHANNEL:-}" ]; then
+            echo "::error::Set the SLACK_INTERNAL_BOT_TOKEN secret and the SLACK_REVIEW_CHANNEL_ID variable."
+            exit 1
+          fi
+          marker="slack-ready-for-review-thread:$CHANNEL:"
+          read -r -a chain <<<"$CHAIN"
+
+          prs=$(for n in "${chain[@]}"; do
+            gh pr view "$n" -R "$REPO" --json number,title,url,author,labels
+          done | jq -s .)
+
+          for n in "${chain[@]}"; do
+            [ "$n" != "$PR_NUMBER" ] || continue
+            has=$(jq --argjson n "$n" --arg l "$LABEL" \
+              'any(.[] | select(.number == $n) | .labels[]; .name == $l)' <<<"$prs")
+            if [ "$has" != "true" ]; then
+              gh api -X POST "repos/$REPO/issues/$n/labels" -f "labels[]=$LABEL" >/dev/null
+            fi
+          done
+
+          thread_ts=""
+          declare -A pr_ts
+          for n in "${chain[@]}"; do
+            ts=$(gh api "repos/$REPO/issues/$n/comments" --paginate \
+                  --jq '.[] | select(.user.login == "github-actions[bot]") | .body' \
+                | grep -o "${marker}[0-9.]*" | tail -1 | sed "s/^${marker}//" || true)
+            pr_ts[$n]="$ts"
+            if [ -z "$thread_ts" ] && [ -n "$ts" ]; then
+              thread_ts="$ts"
+            fi
+          done
+
+          text=$(jq -r --argjson n "$PR_NUMBER" --arg reply "${thread_ts:+yes}" '
+            def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
+            (map(select(.number == $n))[0]) as $pr
+            | (if $reply == "yes" then "Next in this stack is ready for review" else "Ready for review" end) as $lead
+            | "*\($lead):* <\($pr.url)|#\($pr.number) \($pr.title | esc)> by \($pr.author.login)"
+              + (if length > 1
+                 then "\nStack, review from the bottom: " + (map("<\(.url)|#\(.number)>") | join(" → "))
+                 else "" end)
+          ' <<<"$prs")
+
+          payload=$(jq -n --arg c "$CHANNEL" --arg t "$text" --arg ts "$thread_ts" '
+            {channel: $c, text: $t, unfurl_links: false}
+            + (if $ts == "" then {} else {thread_ts: $ts, reply_broadcast: true} end)')
+          resp=$(curl -sS -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_TOKEN" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data "$payload")
+          if [ "$(jq -r .ok <<<"$resp")" != "true" ]; then
+            echo "::error::Slack chat.postMessage failed: $(jq -r .error <<<"$resp")"
+            exit 1
+          fi
+          if [ -z "$thread_ts" ]; then
+            thread_ts=$(jq -r .ts <<<"$resp")
+          fi
+
+          link=$(curl -sS -G https://slack.com/api/chat.getPermalink \
+            -H "Authorization: Bearer $SLACK_TOKEN" \
+            --data-urlencode "channel=$CHANNEL" --data-urlencode "message_ts=$thread_ts" \
+            | jq -r '.permalink // empty' || true)
+          body="Posted to Slack for review${link:+: $link}
+          <!-- ${marker}${thread_ts} -->"
+          for n in "${chain[@]}"; do
+            if [ "${pr_ts[$n]}" != "$thread_ts" ]; then
+              gh api -X POST "repos/$REPO/issues/$n/comments" -f body="$body" >/dev/null
+            fi
+          done
+
+  alert:
+    needs: [stack, notify]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post failure to Slack
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TOKEN: ${{ secrets.SLACK_INTERNAL_BOT_TOKEN }}
+          CHANNEL: ${{ vars.SLACK_REVIEW_CHANNEL_ID }}
+        run: |
+          set -euo pipefail
+          text=":warning: Couldn't post <$PR_URL|#$PR_NUMBER> for review. <$RUN_URL|See the run> for the error."
+          payload=$(jq -n --arg c "$CHANNEL" --arg t "$text" '{channel: $c, text: $t, unfurl_links: false}')
+          curl -sS -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_TOKEN" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data "$payload" | jq -e .ok >/dev/null
