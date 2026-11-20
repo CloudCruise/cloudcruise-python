@@ -25,6 +25,12 @@ class TestVaultInputToPayload(unittest.TestCase):
             },
         )
 
+    def test_omits_a_missing_domain_from_the_payload(self):
+        """The API takes no null domain, so an entry without one is sent with
+        the key absent."""
+        payload = _input_to_payload(VaultEntryInput(permissioned_user_id="u1"))
+        self.assertEqual(payload, {"permissioned_user_id": "u1"})
+
     def test_strips_none_inside_nested_proxy(self):
         entry = VaultEntryInput(
             domain="https://example.com",
@@ -135,6 +141,16 @@ class TestToVaultEntry(unittest.TestCase):
         self.assertEqual(entry.domain, "https://example.com")
         self.assertEqual(entry.user_name, "alice")
         self.assertEqual(entry.tfa_method, "AUTHENTICATOR")
+
+    def test_parses_a_response_with_a_null_domain(self):
+        """An entry without a domain comes back with ``"domain": null``; it
+        must parse to a VaultEntry whose domain is None, not raise."""
+        entry = _to_vault_entry(
+            {"id": "vault-2", "domain": None, "permissioned_user_id": "u2", "max_concurrency": -1}
+        )
+        self.assertIsInstance(entry, VaultEntry)
+        self.assertIsNone(entry.domain)
+        self.assertEqual(entry.max_concurrency, -1)
 
     def test_builds_provider_backed_vault_entry(self):
         response = {
