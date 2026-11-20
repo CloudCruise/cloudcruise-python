@@ -44,11 +44,13 @@ jobs:
           chain=("$PR_NUMBER")
           base="$BASE_REF"
           while [ "$base" != "$DEFAULT_BRANCH" ] && [ "${#chain[@]}" -lt 20 ]; do
-            protected=$(gh api "repos/$REPO/branches/$base" --jq .protected 2>/dev/null || echo true)
+            protected=$(gh api "repos/$REPO/branches/$base" --jq .protected)
             [ "$protected" = "false" ] || break
-            read -r below below_base < <(gh pr list -R "$REPO" --head "$base" --state open \
+            found=$(gh pr list -R "$REPO" --head "$base" --state open \
               --json number,baseRefName,isCrossRepository \
-              --jq 'map(select(.isCrossRepository | not)) | .[0] // empty | "\(.number) \(.baseRefName)"') || break
+              --jq 'map(select(.isCrossRepository | not)) | .[0] // empty | "\(.number) \(.baseRefName)"')
+            [ -n "$found" ] || break
+            read -r below below_base <<<"$found"
             chain=("$below" "${chain[@]}")
             base="$below_base"
           done
@@ -84,7 +86,7 @@ jobs:
           read -r -a chain <<<"$CHAIN"
 
           prs=$(for n in "${chain[@]}"; do
-            gh pr view "$n" -R "$REPO" --json number,title,url,author,labels
+            gh pr view "$n" -R "$REPO" --json number,title,url,author,labels || exit 1
           done | jq -s .)
 
           for n in "${chain[@]}"; do
@@ -99,9 +101,9 @@ jobs:
           thread_ts=""
           declare -A pr_ts
           for n in "${chain[@]}"; do
-            ts=$(gh api "repos/$REPO/issues/$n/comments" --paginate \
-                  --jq '.[] | select(.user.login == "github-actions[bot]") | .body' \
-                | grep -o "${marker}[0-9.]*" | tail -1 | sed "s/^${marker}//" || true)
+            comments=$(gh api "repos/$REPO/issues/$n/comments" --paginate \
+                  --jq '.[] | select(.user.login == "github-actions[bot]") | .body')
+            ts=$(grep -o "${marker}[0-9.]*" <<<"$comments" | tail -1 | sed "s/^${marker}//" || true)
             pr_ts[$n]="$ts"
             if [ -z "$thread_ts" ] && [ -n "$ts" ]; then
               thread_ts="$ts"
@@ -114,7 +116,7 @@ jobs:
             | (if $reply == "yes" then "Next in this stack is ready for review" else "Ready for review" end) as $lead
             | "*\($lead):* <\($pr.url)|#\($pr.number) \($pr.title | esc)> by \($pr.author.login)"
               + (if length > 1
-                 then "\nStack, review from the bottom: " + (map("<\(.url)|#\(.number)>") | join(" → "))
+                 then "\n:pancakes: " + (map("<\(.url)|#\(.number)>") | join(" → "))
                  else "" end)
           ' <<<"$prs")
 
