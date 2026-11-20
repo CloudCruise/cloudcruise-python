@@ -88,15 +88,19 @@ jobs:
           read -r -a chain <<<"$CHAIN"
 
           prs=$(for n in "${chain[@]}"; do
-            gh pr view "$n" -R "$REPO" --json number,title,url,author,labels || exit 1
+            gh pr view "$n" -R "$REPO" --json number,title,url,author,labels,assignees || exit 1
           done | jq -s .)
 
+          # PRs that become ready in this run; their assignees get mentioned. PRs labeled earlier were
+          # already announced.
+          fresh=("$PR_NUMBER")
           for n in "${chain[@]}"; do
             [ "$n" != "$PR_NUMBER" ] || continue
             has=$(jq --argjson n "$n" --arg l "$LABEL" \
               'any(.[] | select(.number == $n) | .labels[]; .name == $l)' <<<"$prs")
             if [ "$has" != "true" ]; then
               gh api -X POST "repos/$REPO/issues/$n/labels" -f "labels[]=$LABEL" >/dev/null
+              fresh+=("$n")
             fi
           done
 
@@ -112,14 +116,20 @@ jobs:
             fi
           done
 
-          text=$(jq -r --argjson n "$PR_NUMBER" --arg reply "${thread_ts:+yes}" --argjson users "${SLACK_USER_MAPPING:-"{}"}" '
+          text=$(jq -r --argjson n "$PR_NUMBER" --arg reply "${thread_ts:+yes}" --argjson users "${SLACK_USER_MAPPING:-"{}"}" \
+            --argjson fresh "$(printf '%s\n' "${fresh[@]}" | jq -s .)" '
             def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
+            def mention: ($users[.] // null) as $id | if $id then "<@\($id)>" else . end;
             (map(select(.number == $n))[0]) as $pr
             | (if $reply == "yes" then "Next in this stack is ready for review" else "Ready for review" end) as $lead
-            | ($users[$pr.author.login] // null) as $slack
-            | "*\($lead):* <\($pr.url)|#\($pr.number) \($pr.title | esc)> by \(if $slack then "<@\($slack)>" else $pr.author.login end)"
+            | ([.[] | select(.number as $x | $fresh | index($x)) | .assignees[].login]
+               | unique | map(select(. != $pr.author.login))) as $assignees
+            | "*\($lead):* <\($pr.url)|#\($pr.number) \($pr.title | esc)> by \($pr.author.login | mention)"
               + (if length > 1
                  then "\n:pancakes: " + (map("<\(.url)|#\(.number)>") | join(" → "))
+                 else "" end)
+              + (if ($assignees | length) > 0
+                 then "\n:eyes: " + ($assignees | map(mention) | join(" "))
                  else "" end)
           ' <<<"$prs")
 
