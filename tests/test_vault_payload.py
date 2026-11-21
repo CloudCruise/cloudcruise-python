@@ -31,6 +31,27 @@ class TestVaultInputToPayload(unittest.TestCase):
         payload = _input_to_payload(VaultEntryInput(permissioned_user_id="u1"))
         self.assertEqual(payload, {"permissioned_user_id": "u1"})
 
+    def test_pinned_settings_are_sent_when_given(self):
+        """pinned_settings tells the API to store those settings on the entry
+        even when equal to the domain value, so the list must reach the body."""
+        payload = _input_to_payload(
+            VaultEntryInput(
+                domain="example.com",
+                permissioned_user_id="u1",
+                max_concurrency=2,
+                pinned_settings=["max_concurrency", "persist_cookies"],
+            )
+        )
+        self.assertEqual(payload["pinned_settings"], ["max_concurrency", "persist_cookies"])
+
+    def test_pinned_settings_are_omitted_when_absent_or_empty(self):
+        """An empty list pins nothing, so the key stays out of the request."""
+        for pinned in (None, []):
+            payload = _input_to_payload(
+                VaultEntryInput(permissioned_user_id="u1", pinned_settings=pinned)
+            )
+            self.assertNotIn("pinned_settings", payload)
+
     def test_strips_none_inside_nested_proxy(self):
         entry = VaultEntryInput(
             domain="https://example.com",

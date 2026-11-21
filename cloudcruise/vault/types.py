@@ -98,6 +98,12 @@ class VaultEntryInput:
     ``max_concurrency=-1`` (no concurrency limit) and a zero interval such as
     ``"0 seconds"`` for ``expiry_time_from_last_use`` and
     ``expiry_time_from_session_data_set`` (no expiry).
+
+    ``pinned_settings`` names settings to store on the entry as its own value
+    even when that value equals the one its domain provides, so a later change
+    to the domain default does not reach them. A setting listed without a value
+    is ignored by the API. It is request-only and not returned on
+    :class:`VaultEntry`. It is sent only when non-empty.
     """
 
     domain: Optional[str] = None
@@ -135,6 +141,7 @@ class VaultEntryInput:
     tfa_methods: Optional[List[TfaMethod]] = None
     additional_fields: Optional[List[VaultAdditionalField]] = None
     security_questions: Optional[List[VaultSecurityQuestion]] = None
+    pinned_settings: Optional[List[SiteSettingsKey]] = None
 
     def __post_init__(self) -> None:
         if self.permissioned_user_id is None:

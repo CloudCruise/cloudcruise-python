@@ -79,6 +79,8 @@ def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
     proxy = payload.get("proxy")
     if isinstance(proxy, dict):
         payload["proxy"] = {k: v for k, v in proxy.items() if v is not None}
+    if not payload.get("pinned_settings"):
+        payload.pop("pinned_settings", None)
     if "tfa_method" in payload:
         warnings.warn(
             "tfa_method is deprecated: set tfa_methods. "

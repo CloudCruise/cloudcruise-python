@@ -509,6 +509,31 @@ class TestVaultOptionalDomain(unittest.TestCase):
         )
 
 
+class TestPinnedSettings(unittest.TestCase):
+    def test_create_and_update_send_pinned_settings_to_the_api(self):
+        """Both POST and PUT bodies carry pinned_settings when given."""
+        server = EchoServer(response={"permissioned_user_id": "u1", "domain": "example.com"})
+        client = VaultClient(server, KEY)
+        entry = VaultEntryInput(
+            domain="example.com",
+            permissioned_user_id="u1",
+            persist_cookies=True,
+            pinned_settings=["persist_cookies"],
+        )
+        client.create(entry)
+        client.update(entry)
+        self.assertEqual([c[0] for c in server.calls], ["POST", "PUT"])
+        for _, _, body in server.calls:
+            self.assertEqual(body["pinned_settings"], ["persist_cookies"])
+
+    def test_create_omits_pinned_settings_when_empty(self):
+        server = EchoServer()
+        VaultClient(server, KEY).create(
+            VaultEntryInput(permissioned_user_id="u1", pinned_settings=[])
+        )
+        self.assertNotIn("pinned_settings", server.calls[0][2])
+
+
 SITE_SETTINGS = {
     "id": "00000000-0000-0000-0000-000000000001",
     "domain": "example.com",

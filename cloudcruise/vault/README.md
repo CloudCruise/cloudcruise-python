@@ -159,6 +159,26 @@ although the domain sets one. `keys` for `reset_site_settings_overrides` are
 `skip_csrf_cookies`, `cookie_domain_to_store` and `login_workflow_id`.
 `max_concurrency` on a domain must be at least 1.
 
+### Pinning Settings on an Entry
+
+An entry stores a value only for a setting you changed on it, so a value equal to
+its domain's still follows later domain changes. List the settings in
+`pinned_settings` on `create` or `update` to store them as the entry's own value
+even when they equal the domain's:
+
+```python
+client.vault.update(
+    VaultEntryInput(
+        permissioned_user_id="user123",
+        max_concurrency=2,
+        pinned_settings=["max_concurrency"],  # same keys as reset_site_settings_overrides
+    )
+)
+```
+
+A setting listed without a value is ignored. `pinned_settings` is request-only
+(not returned on `VaultEntry`) and is left out of the request when empty.
+
 ### Additional Fields, 2FA Methods and Security Questions
 
 ```python
