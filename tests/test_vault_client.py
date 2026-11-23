@@ -15,6 +15,10 @@ from cloudcruise import (
     VaultSecurityQuestion,
     VaultEntry,
     VaultSecurityQuestionWarning,
+    SiteSettings,
+    SiteSettingsEntry,
+    SiteSettingsEntryOverrides,
+    SiteSettingsValues,
 )
 from cloudcruise.vault.client import VaultClient
 from cloudcruise.vault.utils import decrypt_data, encrypt_sensitive_fields
@@ -428,6 +432,211 @@ class TestVaultTfaCode(unittest.TestCase):
         server = EchoServer(response=self.CODE)
         VaultClient(server, KEY).get_tfa_code("user123", "example.com", field="")
         self.assertTrue(server.calls[0][1].endswith("&field="))
+
+
+class TestPinnedSettings(unittest.TestCase):
+    def test_create_and_update_send_pinned_settings_to_the_api(self):
+        """Both POST and PUT bodies carry pinned_settings when given."""
+        server = EchoServer(response={"permissioned_user_id": "u1", "domain": "example.com"})
+        client = VaultClient(server, KEY)
+        entry = VaultEntryInput(
+            domain="example.com",
+            permissioned_user_id="u1",
+            persist_cookies=True,
+            pinned_settings=["persist_cookies"],
+        )
+        client.create(entry)
+        client.update(entry)
+        self.assertEqual([c[0] for c in server.calls], ["POST", "PUT"])
+        for _, _, body in server.calls:
+            self.assertEqual(body["pinned_settings"], ["persist_cookies"])
+
+    def test_create_omits_pinned_settings_when_empty(self):
+        server = EchoServer()
+        VaultClient(server, KEY).create(
+            VaultEntryInput(domain="example.com", permissioned_user_id="u1", pinned_settings=[])
+        )
+        self.assertNotIn("pinned_settings", server.calls[0][2])
+
+
+SITE_SETTINGS = {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "domain": "example.com",
+    "settings": {"max_concurrency": 3, "persist_cookies": True},
+    "entry_count": 4,
+    "overrides": {"max_concurrency": 1},
+    "unknown_future_key": 1,
+}
+
+
+class TestSiteSettings(unittest.TestCase):
+    def test_list_site_settings_returns_dataclasses_with_unset_values_as_none(self):
+        """A domain default the API reports as null (or omits) means the
+        platform default applies, and is None on the dataclass."""
+        server = EchoServer(response=[SITE_SETTINGS])
+        result = VaultClient(server, KEY).list_site_settings()
+
+        self.assertEqual(server.calls[0], ("GET", "/vault/site-settings", None))
+        self.assertIsInstance(result[0], SiteSettings)
+        self.assertIsInstance(result[0].settings, SiteSettingsValues)
+        self.assertEqual(result[0].settings.max_concurrency, 3)
+        self.assertIs(result[0].settings.persist_cookies, True)
+        self.assertIsNone(result[0].settings.login_workflow_id)
+        self.assertEqual(result[0].entry_count, 4)
+        self.assertEqual(result[0].overrides, {"max_concurrency": 1})
+
+    def test_update_site_settings_sends_only_the_settings_that_were_given(self):
+        """A setting that is not passed must stay out of the PATCH body so the
+        domain keeps its value."""
+        server = EchoServer(response=SITE_SETTINGS)
+        result = VaultClient(server, KEY).update_site_settings(
+            "example.com", max_concurrency=3, persist_cookies=False
+        )
+        self.assertEqual(
+            server.calls[0],
+            (
+                "PATCH",
+                "/vault/site-settings",
+                {"domain": "example.com", "max_concurrency": 3, "persist_cookies": False},
+            ),
+        )
+        self.assertIsInstance(result, SiteSettings)
+
+    def test_update_site_settings_sends_none_as_an_explicit_null(self):
+        """None clears a default so the platform default applies; it only
+        reaches the API as a null, not as an omitted key."""
+        server = EchoServer(response=SITE_SETTINGS)
+        VaultClient(server, KEY).update_site_settings(
+            "example.com",
+            max_concurrency=None,
+            expiry_time_from_last_use=None,
+            login_workflow_id=None,
+        )
+        self.assertEqual(
+            server.calls[0][2],
+            {
+                "domain": "example.com",
+                "max_concurrency": None,
+                "expiry_time_from_last_use": None,
+                "login_workflow_id": None,
+            },
+        )
+
+    def test_update_site_settings_requires_a_domain(self):
+        server = EchoServer(response=SITE_SETTINGS)
+        with self.assertRaisesRegex(ValueError, "domain is required"):
+            VaultClient(server, KEY).update_site_settings("")
+        self.assertEqual(server.calls, [])
+
+    def test_list_site_settings_entries_queries_by_domain_and_parses_entries(self):
+        server = EchoServer(
+            response=[
+                {"id": "e1", "permissioned_user_id": "u1", "overridden": ["max_concurrency"]},
+                {"id": "e2", "permissioned_user_id": "u2", "overridden": []},
+            ]
+        )
+        result = VaultClient(server, KEY).list_site_settings_entries("example.com")
+        self.assertEqual(
+            server.calls[0], ("GET", "/vault/site-settings/entries?domain=example.com", None)
+        )
+        self.assertEqual(
+            result,
+            [
+                SiteSettingsEntry(id="e1", permissioned_user_id="u1", overridden=["max_concurrency"]),
+                SiteSettingsEntry(id="e2", permissioned_user_id="u2", overridden=[]),
+            ],
+        )
+
+    def test_apply_site_settings_defaults_without_entry_ids_omits_the_key(self):
+        """Omitting entry_ids resets every entry on the domain."""
+        server = EchoServer(response=SITE_SETTINGS)
+        result = VaultClient(server, KEY).apply_site_settings_defaults("example.com")
+        self.assertEqual(
+            server.calls[0],
+            ("PATCH", "/vault/site-settings/entries", {"domain": "example.com"}),
+        )
+        self.assertIsInstance(result, SiteSettings)
+
+    def test_apply_site_settings_defaults_sends_the_given_entry_ids(self):
+        server = EchoServer(response=SITE_SETTINGS)
+        VaultClient(server, KEY).apply_site_settings_defaults("example.com", ["e1", "e2"])
+        self.assertEqual(server.calls[0][2], {"domain": "example.com", "entry_ids": ["e1", "e2"]})
+
+    def test_apply_site_settings_defaults_rejects_an_empty_entry_id_list(self):
+        """The API requires at least one id when entry_ids is present; an empty
+        list must not silently mean "every entry" either."""
+        server = EchoServer(response=SITE_SETTINGS)
+        with self.assertRaisesRegex(ValueError, "entry_ids must not be empty"):
+            VaultClient(server, KEY).apply_site_settings_defaults("example.com", [])
+        self.assertEqual(server.calls, [])
+
+    def test_get_site_settings_overrides_queries_by_user_id_and_domain(self):
+        server = EchoServer(
+            response={"id": "e1", "domain": "example.com", "overridden": ["max_concurrency"]}
+        )
+        result = VaultClient(server, KEY).get_site_settings_overrides("user123", "example.com")
+
+        self.assertEqual(
+            server.calls[0][1],
+            "/vault/site-settings/overrides?permissioned_user_id=user123&domain=example.com",
+        )
+        self.assertEqual(
+            result,
+            SiteSettingsEntryOverrides(
+                id="e1", domain="example.com", overridden=["max_concurrency"]
+            ),
+        )
+
+    def test_get_site_settings_overrides_requires_a_domain(self):
+        server = EchoServer()
+        with self.assertRaisesRegex(ValueError, "domain is required"):
+            VaultClient(server, KEY).get_site_settings_overrides("user123", "")
+        self.assertEqual(server.calls, [])
+
+    def test_reset_site_settings_overrides_sends_user_id_keys_and_domain(self):
+        server = EchoServer(response={"id": "e1", "domain": "example.com", "overridden": []})
+        VaultClient(server, KEY).reset_site_settings_overrides(
+            "user123", ["persist_cookies", "login_workflow_id"], domain="example.com"
+        )
+        self.assertEqual(
+            server.calls[0],
+            (
+                "PATCH",
+                "/vault/site-settings/overrides",
+                {
+                    "permissioned_user_id": "user123",
+                    "keys": ["persist_cookies", "login_workflow_id"],
+                    "domain": "example.com",
+                },
+            ),
+        )
+
+    def test_reset_site_settings_overrides_requires_a_domain(self):
+        server = EchoServer()
+        with self.assertRaisesRegex(ValueError, "domain is required"):
+            VaultClient(server, KEY).reset_site_settings_overrides(
+                "user123", ["max_concurrency"], ""
+            )
+        self.assertEqual(server.calls, [])
+
+    def test_reset_site_settings_overrides_requires_at_least_one_key(self):
+        server = EchoServer()
+        with self.assertRaisesRegex(ValueError, "keys must name at least one"):
+            VaultClient(server, KEY).reset_site_settings_overrides("user123", [], "example.com")
+        self.assertEqual(server.calls, [])
+
+    def test_module_level_helpers_delegate_to_the_default_client(self):
+        fake = SimpleNamespace(vault=mock.Mock())
+        with mock.patch.object(cloudcruise._default, "get_client", return_value=fake):
+            cloudcruise.vault.update_site_settings("example.com", max_concurrency=None)
+            cloudcruise.vault.apply_site_settings_defaults("example.com", ["e1"])
+        update_kwargs = fake.vault.update_site_settings.call_args
+        self.assertEqual(update_kwargs.args, ("example.com",))
+        self.assertIsNone(update_kwargs.kwargs["max_concurrency"])
+        self.assertIs(
+            update_kwargs.kwargs["persist_cookies"], cloudcruise.vault.UNSET
+        )
+        fake.vault.apply_site_settings_defaults.assert_called_once_with("example.com", ["e1"])
 
 
 if __name__ == "__main__":

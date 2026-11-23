@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, List, Literal, Optional, TypedDict, Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
 
 TfaMethod = Literal["AUTHENTICATOR", "EMAIL", "SMS", "MAGIC_LINK"]
@@ -85,6 +85,19 @@ class VaultEntryInput:
     ``effective_expires_at``) and server-computed reflections
     (``tfa_email``, ``tfa_phone_number``). Those only appear on
     :class:`VaultEntry` responses.
+
+    Settings left as ``None`` are not sent, so the entry inherits the value
+    from its domain's settings (see ``client.vault.update_site_settings``).
+    Two values mean "turned off although the domain sets a value":
+    ``max_concurrency=-1`` (no concurrency limit) and a zero interval such as
+    ``"0 seconds"`` for ``expiry_time_from_last_use`` and
+    ``expiry_time_from_session_data_set`` (no expiry).
+
+    ``pinned_settings`` names settings to store on the entry as its own value
+    even when that value equals the one its domain provides, so a later change
+    to the domain default does not reach them. A setting listed without a value
+    is ignored by the API. It is request-only and not returned on
+    :class:`VaultEntry`. It is sent only when non-empty.
     """
 
     domain: str
@@ -122,6 +135,7 @@ class VaultEntryInput:
     tfa_methods: Optional[List[TfaMethod]] = None
     additional_fields: Optional[List[VaultAdditionalField]] = None
     security_questions: Optional[List[VaultSecurityQuestion]] = None
+    pinned_settings: Optional[List[SiteSettingsKey]] = None
 
 
 @dataclass
@@ -136,6 +150,12 @@ class VaultEntry:
     requests has no effect; the server ignores them.
 
     ``tfa_method`` is deprecated and reads as the first of ``tfa_methods``.
+
+    ``max_concurrency``, ``expiry_time_from_last_use`` and
+    ``expiry_time_from_session_data_set`` are the entry's own values; ``None``
+    means the entry inherits the domain's setting. ``max_concurrency=-1`` or a
+    zero interval (``"0 seconds"``) means the entry turns the limit off although
+    the domain sets a value.
     """
 
     domain: str
@@ -216,3 +236,76 @@ class VaultTfaCode:
             f"expires_in_seconds={self.expires_in_seconds!r}, "
             f"received_at={self.received_at!r})"
         )
+
+
+SiteSettingsKey = Literal[
+    "max_concurrency",
+    "allow_multiple_sessions",
+    "prevent_concurrency_during_login",
+    "expiry_time_from_last_use",
+    "expiry_time_from_session_data_set",
+    "persist_cookies",
+    "persist_local_storage",
+    "persist_session_storage",
+    "skip_csrf_cookies",
+    "cookie_domain_to_store",
+    "login_workflow_id",
+]
+
+
+@dataclass
+class SiteSettingsValues:
+    """The defaults a domain sets. ``None`` means the domain sets nothing for
+    that setting and the platform default applies."""
+
+    allow_multiple_sessions: Optional[bool] = None
+    cookie_domain_to_store: Optional[str] = None
+    expiry_time_from_last_use: Optional[str] = None
+    expiry_time_from_session_data_set: Optional[str] = None
+    login_workflow_id: Optional[str] = None
+    max_concurrency: Optional[int] = None
+    persist_cookies: Optional[bool] = None
+    persist_local_storage: Optional[bool] = None
+    persist_session_storage: Optional[bool] = None
+    prevent_concurrency_during_login: Optional[bool] = None
+    skip_csrf_cookies: Optional[bool] = None
+
+
+@dataclass
+class SiteSettings:
+    """The settings of one domain in the workspace: the defaults every vault
+    entry on the domain inherits unless it sets its own value.
+
+    ``entry_count`` is the number of entries in the workspace on the domain.
+    ``overrides`` maps each setting to how many of those entries set their own
+    value instead of inheriting the default.
+    """
+
+    id: str
+    domain: str
+    settings: SiteSettingsValues
+    entry_count: int
+    overrides: Dict[str, int] = field(default_factory=dict)
+
+
+@dataclass
+class SiteSettingsEntry:
+    """A vault entry on a domain.
+
+    ``overridden`` lists the settings the entry sets itself. Every other
+    setting is read from the domain defaults.
+    """
+
+    id: str
+    permissioned_user_id: str
+    overridden: List[str] = field(default_factory=list)
+
+
+@dataclass
+class SiteSettingsEntryOverrides:
+    """The settings one vault entry sets itself (``overridden``). Every other
+    setting is read from the domain settings."""
+
+    id: str
+    domain: str
+    overridden: List[str] = field(default_factory=list)

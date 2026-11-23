@@ -94,6 +94,71 @@ client.vault.get_tfa_code("user123", "https://example.com", method="EMAIL")
 client.vault.get_tfa_code("user123", "https://example.com", field="Backup authenticator")
 ```
 
+### Domain Settings and Inheritance
+
+Session persistence, concurrency, expiry and the login workflow can be set once
+per domain. Every vault entry on the domain inherits them unless it sets its own
+value ([Domain settings](https://docs.cloudcruise.com/concepts/vault#domain-settings)).
+
+```python
+# Every domain with its defaults, entry count and how many entries override each setting
+for site in client.vault.list_site_settings():
+    print(site.domain, site.entry_count, site.settings.max_concurrency, site.overrides)
+
+# Change defaults. Only the settings you pass change; None clears a default
+# (sent as an explicit null) so the platform default applies.
+site = client.vault.update_site_settings(
+    "example.com",
+    max_concurrency=3,
+    persist_cookies=True,
+    expiry_time_from_last_use=None,
+)
+
+# Entries on a domain and the settings each one sets itself
+for entry in client.vault.list_site_settings_entries("example.com"):
+    print(entry.id, entry.permissioned_user_id, entry.overridden)
+
+# Settings of one entry that differ from the domain
+overrides = client.vault.get_site_settings_overrides("user123", "example.com")
+
+# Make an entry read the domain again for the listed settings
+client.vault.reset_site_settings_overrides("user123", ["max_concurrency"], domain="example.com")
+
+# Remove every own setting of the listed entries (all entries on the domain without entry_ids)
+client.vault.apply_site_settings_defaults("example.com", entry_ids=[entry.id])
+```
+
+On an entry, `None` means "inherit the domain's value". `max_concurrency=-1` or a
+zero interval (`"0 seconds"`) for `expiry_time_from_last_use` /
+`expiry_time_from_session_data_set` is an own value that turns the limit off
+although the domain sets one. `keys` for `reset_site_settings_overrides` are
+`max_concurrency`, `allow_multiple_sessions`, `prevent_concurrency_during_login`,
+`expiry_time_from_last_use`, `expiry_time_from_session_data_set`,
+`persist_cookies`, `persist_local_storage`, `persist_session_storage`,
+`skip_csrf_cookies`, `cookie_domain_to_store` and `login_workflow_id`.
+`max_concurrency` on a domain must be at least 1.
+
+### Pinning Settings on an Entry
+
+An entry stores a value only for a setting you changed on it, so a value equal to
+its domain's still follows later domain changes. List the settings in
+`pinned_settings` on `create` or `update` to store them as the entry's own value
+even when they equal the domain's:
+
+```python
+client.vault.update(
+    VaultEntryInput(
+        domain="example.com",
+        permissioned_user_id="user123",
+        max_concurrency=2,
+        pinned_settings=["max_concurrency"],  # same keys as reset_site_settings_overrides
+    )
+)
+```
+
+A setting listed without a value is ignored. `pinned_settings` is request-only
+(not returned on `VaultEntry`) and is left out of the request when empty.
+
 ### Additional Fields, 2FA Methods and Security Questions
 
 ```python
@@ -166,6 +231,8 @@ entry = client.vault.create(
   `organization_id`, `site_identifier`, `tfa_email`, `tfa_phone_number`,
   `session_data_set_at`, `effective_expires_at`).
 - `VaultEntry` — full shape returned by the API, including the fields above.
+- `SiteSettings`, `SiteSettingsValues`, `SiteSettingsEntry`,
+  `SiteSettingsEntryOverrides` — domain settings responses.
 
 ### Low-level Encryption Helpers
 

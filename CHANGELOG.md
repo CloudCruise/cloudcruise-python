@@ -4,6 +4,9 @@
 
 ### Added
 
+- `pinned_settings` on `VaultEntryInput` (a list of `SiteSettingsKey`) stores the named settings on the entry as its own value even when equal to its domain's, so later domain changes do not reach them. Request-only; sent on create and update only when non-empty.
+- Domain settings, the defaults every vault entry on a domain inherits: `client.vault.list_site_settings()`, `update_site_settings(domain, **settings)` (`None` clears a default and is sent as an explicit `null`), `list_site_settings_entries(domain)`, `apply_site_settings_defaults(domain, entry_ids=None)`, `get_site_settings_overrides(permissioned_user_id, domain)` and `reset_site_settings_overrides(permissioned_user_id, keys, domain)`, typed as `SiteSettings`, `SiteSettingsValues`, `SiteSettingsEntry`, `SiteSettingsEntryOverrides` and `SiteSettingsKey`. On an entry, `max_concurrency=-1` or a zero interval (`"0 seconds"`) for the two expiry fields turns the limit off although the domain sets one.
+
 - `Workflow` (returned by `client.workflows.get_all_workflows()`) includes the settings the API already returns: `enable_password_update_recovery`, `enable_decision_required_recovery`, `decision_timeout_seconds`, `decision_mention_slack_ids`, `allow_requeue` and `deny_requeue_past_dry_run_marker`. All default to `None`, so existing code that builds a `Workflow` still works, and a field the API omits stays `None`.
 
 ## 1.5.0

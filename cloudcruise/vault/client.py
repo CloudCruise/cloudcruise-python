@@ -4,10 +4,16 @@ import os
 import sys
 import warnings
 from dataclasses import asdict, fields as _dc_fields
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Union
+from urllib.parse import urlencode
 from .types import (
     GetVaultEntriesFilters,
     ProxyConfig,
+    SiteSettings,
+    SiteSettingsEntry,
+    SiteSettingsEntryOverrides,
+    SiteSettingsKey,
+    SiteSettingsValues,
     TfaMethod,
     VaultAdditionalField,
     VaultAdditionalFieldWarning,
@@ -24,6 +30,7 @@ _PACKAGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.
 _VAULT_ENTRY_FIELDS = {f.name for f in _dc_fields(VaultEntry)}
 _PROXY_FIELDS = {f.name for f in _dc_fields(ProxyConfig)}
 _TFA_CODE_FIELDS = {f.name for f in _dc_fields(VaultTfaCode)}
+_SITE_SETTINGS_VALUE_FIELDS = tuple(f.name for f in _dc_fields(SiteSettingsValues))
 _NESTED_LIST_TYPES = {
     key: (cls, tuple(f.name for f in _dc_fields(cls)))
     for key, cls in (
@@ -72,6 +79,8 @@ def _input_to_payload(entry: VaultEntryInput) -> Dict[str, Any]:
     proxy = payload.get("proxy")
     if isinstance(proxy, dict):
         payload["proxy"] = {k: v for k, v in proxy.items() if v is not None}
+    if not payload.get("pinned_settings"):
+        payload.pop("pinned_settings", None)
     if "tfa_method" in payload:
         warnings.warn(
             "tfa_method is deprecated: set tfa_methods. "
@@ -111,6 +120,57 @@ def _validate_provider_payload(payload: Dict[str, Any]) -> None:
                 "provider-backed vault entries cannot include "
                 + ", ".join(conflicts)
             )
+
+
+class _Unset:
+    """Type of :data:`UNSET`, the "argument not given" marker of
+    :meth:`VaultClient.update_site_settings`. ``None`` is a real value there
+    (it clears a default), so it cannot also mean "not given"."""
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+    def __bool__(self) -> bool:
+        return False
+
+
+UNSET = _Unset()
+
+
+def _to_site_settings(data: Dict[str, Any]) -> SiteSettings:
+    raw_values = data.get("settings")
+    values = SiteSettingsValues(
+        **{
+            name: raw_values.get(name)
+            for name in _SITE_SETTINGS_VALUE_FIELDS
+            if isinstance(raw_values, dict)
+        }
+    )
+    return SiteSettings(
+        id=data["id"],
+        domain=data["domain"],
+        settings=values,
+        entry_count=data.get("entry_count", 0),
+        overrides=dict(data.get("overrides") or {}),
+    )
+
+
+def _to_site_settings_entry(data: Dict[str, Any]) -> SiteSettingsEntry:
+    return SiteSettingsEntry(
+        id=data["id"],
+        permissioned_user_id=data["permissioned_user_id"],
+        overridden=list(data.get("overridden") or []),
+    )
+
+
+def _to_site_settings_entry_overrides(
+    data: Dict[str, Any],
+) -> SiteSettingsEntryOverrides:
+    return SiteSettingsEntryOverrides(
+        id=data["id"],
+        domain=data["domain"],
+        overridden=list(data.get("overridden") or []),
+    )
 
 
 def _to_vault_entry(data: Dict[str, Any]) -> VaultEntry:
@@ -154,8 +214,6 @@ class VaultClient:
     def get(self, filters: Optional[GetVaultEntriesFilters] = None) -> List[VaultEntry]:
         path = "/vault"
         if filters and (filters.permissioned_user_id or filters.domain):
-            from urllib.parse import urlencode
-
             params: Dict[str, Any] = {}
             if filters.permissioned_user_id:
                 params["permissioned_user_id"] = filters.permissioned_user_id
@@ -226,8 +284,6 @@ class VaultClient:
             raise ValueError("domain is required to get a TFA code")
         if field is not None and method not in (None, "AUTHENTICATOR"):
             raise ValueError("field requires method AUTHENTICATOR or no method")
-        from urllib.parse import urlencode
-
         params: Dict[str, str] = {
             "permissioned_user_id": permissioned_user_id,
             "domain": domain,
@@ -240,3 +296,140 @@ class VaultClient:
         response = self._make_request("GET", f"/vault/tfa-code?{qs}")
         known = {k: v for k, v in response.items() if k in _TFA_CODE_FIELDS}
         return VaultTfaCode(**known)
+
+    def list_site_settings(self) -> List[SiteSettings]:
+        """List the workspace's domain settings: the defaults every vault entry
+        on a domain inherits unless it sets its own value.
+
+        Each item also carries ``entry_count`` (entries on the domain) and, per
+        setting, how many of those entries override it.
+        """
+        response = self._make_request("GET", "/vault/site-settings")
+        return [_to_site_settings(item) for item in response]
+
+    def update_site_settings(
+        self,
+        domain: str,
+        *,
+        max_concurrency: Union[int, None, _Unset] = UNSET,
+        allow_multiple_sessions: Union[bool, None, _Unset] = UNSET,
+        prevent_concurrency_during_login: Union[bool, None, _Unset] = UNSET,
+        expiry_time_from_last_use: Union[str, None, _Unset] = UNSET,
+        expiry_time_from_session_data_set: Union[str, None, _Unset] = UNSET,
+        persist_cookies: Union[bool, None, _Unset] = UNSET,
+        persist_local_storage: Union[bool, None, _Unset] = UNSET,
+        persist_session_storage: Union[bool, None, _Unset] = UNSET,
+        skip_csrf_cookies: Union[bool, None, _Unset] = UNSET,
+        cookie_domain_to_store: Union[str, None, _Unset] = UNSET,
+        login_workflow_id: Union[str, None, _Unset] = UNSET,
+    ) -> SiteSettings:
+        """Set the defaults of one domain, creating them when the domain has
+        none yet.
+
+        ``domain`` is normalised like entry domains (lowercase, no scheme, path
+        or www). Only the settings you pass change. Passing ``None`` clears a
+        default so the platform default applies; the SDK sends it as an
+        explicit ``null``. A setting you do not pass is left out of the request
+        and keeps its value. Entries that set their own value keep it.
+
+        ``max_concurrency`` must be at least 1 and ``cookie_domain_to_store``
+        at most 128 characters; ``login_workflow_id`` is a workflow UUID.
+        """
+        if not domain:
+            raise ValueError("domain is required to update site settings")
+        given: Dict[str, Any] = {
+            "max_concurrency": max_concurrency,
+            "allow_multiple_sessions": allow_multiple_sessions,
+            "prevent_concurrency_during_login": prevent_concurrency_during_login,
+            "expiry_time_from_last_use": expiry_time_from_last_use,
+            "expiry_time_from_session_data_set": expiry_time_from_session_data_set,
+            "persist_cookies": persist_cookies,
+            "persist_local_storage": persist_local_storage,
+            "persist_session_storage": persist_session_storage,
+            "skip_csrf_cookies": skip_csrf_cookies,
+            "cookie_domain_to_store": cookie_domain_to_store,
+            "login_workflow_id": login_workflow_id,
+        }
+        body: Dict[str, Any] = {"domain": domain}
+        body.update({k: v for k, v in given.items() if not isinstance(v, _Unset)})
+        response = self._make_request("PATCH", "/vault/site-settings", body)
+        return _to_site_settings(response)
+
+    def list_site_settings_entries(self, domain: str) -> List[SiteSettingsEntry]:
+        """List the workspace's vault entries that use the domain's settings,
+        each with ``overridden``: the settings it sets itself instead of
+        inheriting the domain default."""
+        if not domain:
+            raise ValueError("domain is required to list the entries of a domain")
+        qs = urlencode({"domain": domain})
+        response = self._make_request("GET", f"/vault/site-settings/entries?{qs}")
+        return [_to_site_settings_entry(item) for item in response]
+
+    def apply_site_settings_defaults(
+        self, domain: str, entry_ids: Optional[Sequence[str]] = None
+    ) -> SiteSettings:
+        """Remove every setting the listed entries set themselves, so they read
+        all settings from the domain defaults.
+
+        Without ``entry_ids`` it applies to every entry on the domain. Returns
+        the updated domain settings.
+        """
+        if not domain:
+            raise ValueError("domain is required to apply site settings defaults")
+        body: Dict[str, Any] = {"domain": domain}
+        if entry_ids is not None:
+            if len(entry_ids) == 0:
+                raise ValueError(
+                    "entry_ids must not be empty; omit it to apply to every entry"
+                )
+            body["entry_ids"] = list(entry_ids)
+        response = self._make_request("PATCH", "/vault/site-settings/entries", body)
+        return _to_site_settings(response)
+
+    def get_site_settings_overrides(
+        self, permissioned_user_id: str, domain: str
+    ) -> SiteSettingsEntryOverrides:
+        """Get the settings a vault entry stores itself (``overridden``). Every
+        other setting is read from the domain settings.
+
+        On an entry, ``max_concurrency=-1`` or a zero interval (``"0 seconds"``) for
+        the two expiry settings is an own value that turns the limit off
+        although the domain sets one; ``None`` means the entry inherits.
+        """
+        if not permissioned_user_id:
+            raise ValueError("permissioned_user_id is required to get site overrides")
+        if not domain:
+            raise ValueError("domain is required to get site overrides")
+        params: Dict[str, str] = {
+            "permissioned_user_id": permissioned_user_id,
+            "domain": domain,
+        }
+        qs = urlencode(params)
+        response = self._make_request("GET", f"/vault/site-settings/overrides?{qs}")
+        return _to_site_settings_entry_overrides(response)
+
+    def reset_site_settings_overrides(
+        self,
+        permissioned_user_id: str,
+        keys: Sequence[SiteSettingsKey],
+        domain: str,
+    ) -> SiteSettingsEntryOverrides:
+        """Stop a vault entry from overriding the listed settings, so it reads
+        them from the domain settings again.
+
+        ``keys`` must name at least one setting. Returns the settings the entry still
+        overrides.
+        """
+        if not permissioned_user_id:
+            raise ValueError("permissioned_user_id is required to reset site overrides")
+        if not keys:
+            raise ValueError("keys must name at least one setting to reset")
+        if not domain:
+            raise ValueError("domain is required to reset site overrides")
+        body: Dict[str, Any] = {
+            "permissioned_user_id": permissioned_user_id,
+            "keys": list(keys),
+            "domain": domain,
+        }
+        response = self._make_request("PATCH", "/vault/site-settings/overrides", body)
+        return _to_site_settings_entry_overrides(response)
