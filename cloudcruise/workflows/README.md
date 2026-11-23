@@ -35,9 +35,6 @@ for variable_name, credential in metadata.vault_schema.items():
     print(variable_name, credential.domain, credential.example)
 ```
 
-`domain` and `example` are optional on a credential: `domain` is `None` for an alias
-that names no domain (it then uses the only vault entry of the passed user ID).
-
 ### Validating Workflow Input
 
 The SDK can proactively validate run payloads against the workflow's input

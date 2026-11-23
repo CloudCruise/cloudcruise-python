@@ -80,7 +80,7 @@ def delete(params: Dict[str, str]) -> None:
 
 def get_tfa_code(
     permissioned_user_id: str,
-    domain: Optional[str] = None,
+    domain: str,
     method: Optional[TfaMethod] = None,
     field: Optional[str] = None,
 ) -> VaultTfaCode:
@@ -133,7 +133,7 @@ def apply_site_settings_defaults(
 
 
 def get_site_settings_overrides(
-    permissioned_user_id: str, domain: Optional[str] = None
+    permissioned_user_id: str, domain: str
 ) -> SiteSettingsEntryOverrides:
     return _client().vault.get_site_settings_overrides(permissioned_user_id, domain)
 
@@ -141,7 +141,7 @@ def get_site_settings_overrides(
 def reset_site_settings_overrides(
     permissioned_user_id: str,
     keys: Sequence[SiteSettingsKey],
-    domain: Optional[str] = None,
+    domain: str,
 ) -> SiteSettingsEntryOverrides:
     return _client().vault.reset_site_settings_overrides(
         permissioned_user_id, keys, domain

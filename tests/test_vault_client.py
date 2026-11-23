@@ -434,81 +434,6 @@ class TestVaultTfaCode(unittest.TestCase):
         self.assertTrue(server.calls[0][1].endswith("&field="))
 
 
-class TestVaultOptionalDomain(unittest.TestCase):
-    def test_create_without_a_domain_leaves_domain_out_of_the_request(self):
-        """An entry without a domain is addressed by its user ID alone, and
-        the API rejects a null domain, so the key must be absent."""
-        server = EchoServer()
-        result = VaultClient(server, KEY).create(
-            VaultEntryInput(permissioned_user_id="user123", user_name="alice")
-        )
-        self.assertNotIn("domain", server.calls[0][2])
-        self.assertIsNone(result.domain)
-
-    def test_input_keeps_domain_then_user_id_positional_order(self):
-        """Existing callers pass VaultEntryInput("example.com", "user123")."""
-        entry = VaultEntryInput("example.com", "user123")
-        self.assertEqual((entry.domain, entry.permissioned_user_id), ("example.com", "user123"))
-
-    def test_input_still_requires_the_user_id(self):
-        """The user ID is the only required identifier now; omitting it must
-        fail at construction like before, not later at the API."""
-        with self.assertRaises(TypeError):
-            VaultEntryInput(domain="example.com")
-
-    def test_update_without_a_domain_leaves_domain_out_of_the_request(self):
-        server = EchoServer()
-        VaultClient(server, KEY).update(
-            VaultEntryInput(permissioned_user_id="user123", user_alias="Main")
-        )
-        self.assertEqual(server.calls[0][0], "PUT")
-        self.assertNotIn("domain", server.calls[0][2])
-
-    def test_get_with_a_user_id_alone_sends_only_the_user_id(self):
-        server = EchoServer(response={"permissioned_user_id": "user123", "domain": None})
-        entries = VaultClient(server, KEY).get(
-            GetVaultEntriesFilters(permissioned_user_id="user123")
-        )
-        self.assertEqual(server.calls[0][1], "/vault?permissioned_user_id=user123")
-        self.assertIsNone(entries[0].domain)
-
-    def test_get_with_a_domain_but_no_user_id_raises_before_sending(self):
-        """The API only accepts domain together with permissioned_user_id."""
-        server = EchoServer(response=[])
-        with self.assertRaisesRegex(ValueError, "domain requires permissioned_user_id"):
-            VaultClient(server, KEY).get(GetVaultEntriesFilters(domain="example.com"))
-        self.assertEqual(server.calls, [])
-
-    def test_delete_with_a_user_id_alone_sends_only_the_user_id(self):
-        server = EchoServer()
-        VaultClient(server, KEY).delete({"permissioned_user_id": "user123"})
-        self.assertEqual(server.calls[0], ("DELETE", "/vault", {"permissioned_user_id": "user123"}))
-
-    def test_delete_still_sends_the_domain_when_given(self):
-        server = EchoServer()
-        params = {"permissioned_user_id": "user123", "domain": "example.com"}
-        VaultClient(server, KEY).delete(params)
-        self.assertEqual(server.calls[0][2], params)
-
-    def test_delete_requires_a_user_id(self):
-        server = EchoServer()
-        with self.assertRaisesRegex(ValueError, "permissioned_user_id is required"):
-            VaultClient(server, KEY).delete({"domain": "example.com"})
-        self.assertEqual(server.calls, [])
-
-    def test_get_tfa_code_with_a_user_id_alone_sends_only_the_user_id(self):
-        server = EchoServer(response={"type": "authenticator", "code": "123456"})
-        VaultClient(server, KEY).get_tfa_code("user123")
-        self.assertEqual(server.calls[0][1], "/vault/tfa-code?permissioned_user_id=user123")
-
-    def test_get_tfa_code_with_a_method_and_no_domain_keeps_the_method(self):
-        server = EchoServer(response={"type": "email", "code": "884512"})
-        VaultClient(server, KEY).get_tfa_code("user123", method="EMAIL")
-        self.assertEqual(
-            server.calls[0][1], "/vault/tfa-code?permissioned_user_id=user123&method=EMAIL"
-        )
-
-
 class TestPinnedSettings(unittest.TestCase):
     def test_create_and_update_send_pinned_settings_to_the_api(self):
         """Both POST and PUT bodies carry pinned_settings when given."""
@@ -529,7 +454,7 @@ class TestPinnedSettings(unittest.TestCase):
     def test_create_omits_pinned_settings_when_empty(self):
         server = EchoServer()
         VaultClient(server, KEY).create(
-            VaultEntryInput(permissioned_user_id="u1", pinned_settings=[])
+            VaultEntryInput(domain="example.com", permissioned_user_id="u1", pinned_settings=[])
         )
         self.assertNotIn("pinned_settings", server.calls[0][2])
 
@@ -645,31 +570,32 @@ class TestSiteSettings(unittest.TestCase):
             VaultClient(server, KEY).apply_site_settings_defaults("example.com", [])
         self.assertEqual(server.calls, [])
 
-    def test_get_site_settings_overrides_queries_by_user_id_and_optional_domain(self):
+    def test_get_site_settings_overrides_queries_by_user_id_and_domain(self):
         server = EchoServer(
-            response={"id": "e1", "domain": None, "overridden": ["max_concurrency"]}
+            response={"id": "e1", "domain": "example.com", "overridden": ["max_concurrency"]}
         )
-        client = VaultClient(server, KEY)
-        result = client.get_site_settings_overrides("user123")
-        client.get_site_settings_overrides("user123", "example.com")
+        result = VaultClient(server, KEY).get_site_settings_overrides("user123", "example.com")
 
         self.assertEqual(
-            server.calls[0][1], "/vault/site-settings/overrides?permissioned_user_id=user123"
-        )
-        self.assertEqual(
-            server.calls[1][1],
+            server.calls[0][1],
             "/vault/site-settings/overrides?permissioned_user_id=user123&domain=example.com",
         )
         self.assertEqual(
             result,
-            SiteSettingsEntryOverrides(id="e1", domain=None, overridden=["max_concurrency"]),
+            SiteSettingsEntryOverrides(
+                id="e1", domain="example.com", overridden=["max_concurrency"]
+            ),
         )
 
-    def test_reset_site_settings_overrides_sends_user_id_keys_and_optional_domain(self):
+    def test_get_site_settings_overrides_requires_a_domain(self):
+        server = EchoServer()
+        with self.assertRaisesRegex(ValueError, "domain is required"):
+            VaultClient(server, KEY).get_site_settings_overrides("user123", "")
+        self.assertEqual(server.calls, [])
+
+    def test_reset_site_settings_overrides_sends_user_id_keys_and_domain(self):
         server = EchoServer(response={"id": "e1", "domain": "example.com", "overridden": []})
-        client = VaultClient(server, KEY)
-        client.reset_site_settings_overrides("user123", ["max_concurrency"])
-        client.reset_site_settings_overrides(
+        VaultClient(server, KEY).reset_site_settings_overrides(
             "user123", ["persist_cookies", "login_workflow_id"], domain="example.com"
         )
         self.assertEqual(
@@ -677,22 +603,26 @@ class TestSiteSettings(unittest.TestCase):
             (
                 "PATCH",
                 "/vault/site-settings/overrides",
-                {"permissioned_user_id": "user123", "keys": ["max_concurrency"]},
+                {
+                    "permissioned_user_id": "user123",
+                    "keys": ["persist_cookies", "login_workflow_id"],
+                    "domain": "example.com",
+                },
             ),
         )
-        self.assertEqual(
-            server.calls[1][2],
-            {
-                "permissioned_user_id": "user123",
-                "keys": ["persist_cookies", "login_workflow_id"],
-                "domain": "example.com",
-            },
-        )
+
+    def test_reset_site_settings_overrides_requires_a_domain(self):
+        server = EchoServer()
+        with self.assertRaisesRegex(ValueError, "domain is required"):
+            VaultClient(server, KEY).reset_site_settings_overrides(
+                "user123", ["max_concurrency"], ""
+            )
+        self.assertEqual(server.calls, [])
 
     def test_reset_site_settings_overrides_requires_at_least_one_key(self):
         server = EchoServer()
         with self.assertRaisesRegex(ValueError, "keys must name at least one"):
-            VaultClient(server, KEY).reset_site_settings_overrides("user123", [])
+            VaultClient(server, KEY).reset_site_settings_overrides("user123", [], "example.com")
         self.assertEqual(server.calls, [])
 
     def test_module_level_helpers_delegate_to_the_default_client(self):

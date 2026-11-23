@@ -147,24 +147,6 @@ class TestWorkflowDataclassResponses(unittest.TestCase):
             "https://example.com",
         )
 
-    def test_get_workflow_metadata_accepts_a_credential_without_a_domain(self):
-        """``domain`` and ``example`` are optional on a vault_schema entry, so
-        ``{"type": "credential"}`` parses with both left as None."""
-        client = WorkflowsClient(
-            lambda *_: {
-                "input_schema": {"type": "object"},
-                "workspace_id": "workspace-1",
-                "vault_schema": {"USER": {"type": "credential"}},
-            }
-        )
-
-        entry = client.get_workflow_metadata("wf-1").vault_schema["USER"]
-
-        self.assertIsInstance(entry, WorkflowVaultSchemaEntry)
-        self.assertEqual(entry.type, "credential")
-        self.assertIsNone(entry.domain)
-        self.assertIsNone(entry.example)
-
     def test_get_workflow_metadata_returns_nested_dataclass(self):
         client = WorkflowsClient(
             lambda *_: {

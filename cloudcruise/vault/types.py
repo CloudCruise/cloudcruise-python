@@ -86,12 +86,6 @@ class VaultEntryInput:
     (``tfa_email``, ``tfa_phone_number``). Those only appear on
     :class:`VaultEntry` responses.
 
-    ``permissioned_user_id`` is required. ``domain`` is optional: an entry
-    without a domain is addressed by its user ID alone, and the SDK leaves
-    ``domain`` out of the request when it is ``None``. Without a ``domain``, an
-    update uses the only entry of that user ID and the API answers 409 (listing
-    the domains) when the user ID has several.
-
     Settings left as ``None`` are not sent, so the entry inherits the value
     from its domain's settings (see ``client.vault.update_site_settings``).
     Two values mean "turned off although the domain sets a value":
@@ -106,8 +100,8 @@ class VaultEntryInput:
     :class:`VaultEntry`. It is sent only when non-empty.
     """
 
-    domain: Optional[str] = None
-    permissioned_user_id: str = None  # type: ignore[assignment]
+    domain: str
+    permissioned_user_id: str
     user_id: Optional[str] = None
     user_name: Optional[str] = None
     password: Optional[str] = None
@@ -143,12 +137,6 @@ class VaultEntryInput:
     security_questions: Optional[List[VaultSecurityQuestion]] = None
     pinned_settings: Optional[List[SiteSettingsKey]] = None
 
-    def __post_init__(self) -> None:
-        if self.permissioned_user_id is None:
-            raise TypeError(
-                "VaultEntryInput() missing required argument: 'permissioned_user_id'"
-            )
-
 
 @dataclass
 class VaultEntry:
@@ -163,8 +151,6 @@ class VaultEntry:
 
     ``tfa_method`` is deprecated and reads as the first of ``tfa_methods``.
 
-    ``domain`` is ``None`` for an entry without a domain.
-
     ``max_concurrency``, ``expiry_time_from_last_use`` and
     ``expiry_time_from_session_data_set`` are the entry's own values; ``None``
     means the entry inherits the domain's setting. ``max_concurrency=-1`` or a
@@ -172,7 +158,7 @@ class VaultEntry:
     the domain sets a value.
     """
 
-    domain: Optional[str]
+    domain: str
     permissioned_user_id: str
     id: Optional[str] = None
     workspace_id: Optional[str] = None
@@ -318,9 +304,8 @@ class SiteSettingsEntry:
 @dataclass
 class SiteSettingsEntryOverrides:
     """The settings one vault entry sets itself (``overridden``). Every other
-    setting is read from the domain settings. ``domain`` is ``None`` for an
-    entry without a domain."""
+    setting is read from the domain settings."""
 
     id: str
-    domain: Optional[str]
+    domain: str
     overridden: List[str] = field(default_factory=list)

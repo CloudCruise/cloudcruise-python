@@ -168,7 +168,7 @@ def _to_site_settings_entry_overrides(
 ) -> SiteSettingsEntryOverrides:
     return SiteSettingsEntryOverrides(
         id=data["id"],
-        domain=data.get("domain"),
+        domain=data["domain"],
         overridden=list(data.get("overridden") or []),
     )
 
@@ -182,7 +182,6 @@ def _to_vault_entry(data: Dict[str, Any]) -> VaultEntry:
     on the response is rare but handled defensively.
     """
     known: Dict[str, Any] = {k: v for k, v in data.items() if k in _VAULT_ENTRY_FIELDS}
-    known.setdefault("domain", None)
     proxy = known.get("proxy")
     if isinstance(proxy, dict) and "enable" in proxy:
         known["proxy"] = ProxyConfig(
@@ -213,17 +212,7 @@ class VaultClient:
         return _to_vault_entry(decrypted)
 
     def get(self, filters: Optional[GetVaultEntriesFilters] = None) -> List[VaultEntry]:
-        """Get vault entries.
-
-        Without filters, returns every entry in the workspace. With
-        ``permissioned_user_id`` returns that user ID's entry; ``domain`` is
-        optional while the user ID has a single entry and the API answers 409
-        (listing the domains) when it has several. ``domain`` without
-        ``permissioned_user_id`` raises ``ValueError``.
-        """
         path = "/vault"
-        if filters and filters.domain and not filters.permissioned_user_id:
-            raise ValueError("domain requires permissioned_user_id")
         if filters and (filters.permissioned_user_id or filters.domain):
             params: Dict[str, Any] = {}
             if filters.permissioned_user_id:
@@ -246,10 +235,9 @@ class VaultClient:
     def update(self, entry: VaultEntryInput) -> VaultEntry:
         """Update an existing vault entry.
 
-        ``permissioned_user_id`` identifies the entry and is required on
-        :class:`VaultEntryInput`. ``domain`` is optional while the user ID has a
-        single entry; the API answers 409 (listing the domains) when it has
-        several. Sensitive fields are re-encrypted automatically.
+        ``domain`` and ``permissioned_user_id`` identify the entry and are
+        required on :class:`VaultEntryInput`. Sensitive fields are re-encrypted
+        automatically.
         """
         payload = _input_to_payload(entry)
         processed = encrypt_sensitive_fields(payload, self._encryption_key)
@@ -259,30 +247,23 @@ class VaultClient:
 
     def delete(self, params: Dict[str, str]) -> None:
         """
-        Deletes a vault entry by permissioned_user_id and, optionally, domain
-        params: { "permissioned_user_id": str, "domain": str (optional) }
-
-        Without ``domain`` the API deletes the only entry of the user ID and
-        answers 409 (listing the domains) when the user ID has several.
+        Deletes a vault entry by domain and permissioned_user_id
+        params: { "domain": str, "permissioned_user_id": str }
         """
+        if not params.get("domain"):
+            raise ValueError("domain is required to delete a vault entry")
         if not params.get("permissioned_user_id"):
             raise ValueError("permissioned_user_id is required to delete a vault entry")
-        body = {k: v for k, v in params.items() if v is not None}
-        if not body.get("domain"):
-            body.pop("domain", None)
-        self._make_request("DELETE", "/vault", body)
+        self._make_request("DELETE", "/vault", params)
 
     def get_tfa_code(
         self,
         permissioned_user_id: str,
-        domain: Optional[str] = None,
+        domain: str,
         method: Optional[TfaMethod] = None,
         field: Optional[str] = None,
     ) -> VaultTfaCode:
         """Get the current 2FA code for a single vault entry.
-
-        ``domain`` is optional while the user ID has a single entry; the API
-        answers 409 (listing the domains) when it has several.
 
         ``method`` picks the 2FA method and is required when the entry has
         several ``tfa_methods``. ``field`` names a ``Totp`` additional field
@@ -299,11 +280,14 @@ class VaultClient:
         """
         if not permissioned_user_id:
             raise ValueError("permissioned_user_id is required to get a TFA code")
+        if not domain:
+            raise ValueError("domain is required to get a TFA code")
         if field is not None and method not in (None, "AUTHENTICATOR"):
             raise ValueError("field requires method AUTHENTICATOR or no method")
-        params: Dict[str, str] = {"permissioned_user_id": permissioned_user_id}
-        if domain:
-            params["domain"] = domain
+        params: Dict[str, str] = {
+            "permissioned_user_id": permissioned_user_id,
+            "domain": domain,
+        }
         if method is not None:
             params["method"] = method
         if field is not None:
@@ -403,21 +387,23 @@ class VaultClient:
         return _to_site_settings(response)
 
     def get_site_settings_overrides(
-        self, permissioned_user_id: str, domain: Optional[str] = None
+        self, permissioned_user_id: str, domain: str
     ) -> SiteSettingsEntryOverrides:
         """Get the settings a vault entry stores itself (``overridden``). Every
         other setting is read from the domain settings.
 
-        ``domain`` is optional while the user ID has a single entry. On an
-        entry, ``max_concurrency=-1`` or a zero interval (``"0 seconds"``) for
+        On an entry, ``max_concurrency=-1`` or a zero interval (``"0 seconds"``) for
         the two expiry settings is an own value that turns the limit off
         although the domain sets one; ``None`` means the entry inherits.
         """
         if not permissioned_user_id:
             raise ValueError("permissioned_user_id is required to get site overrides")
-        params: Dict[str, str] = {"permissioned_user_id": permissioned_user_id}
-        if domain:
-            params["domain"] = domain
+        if not domain:
+            raise ValueError("domain is required to get site overrides")
+        params: Dict[str, str] = {
+            "permissioned_user_id": permissioned_user_id,
+            "domain": domain,
+        }
         qs = urlencode(params)
         response = self._make_request("GET", f"/vault/site-settings/overrides?{qs}")
         return _to_site_settings_entry_overrides(response)
@@ -426,24 +412,24 @@ class VaultClient:
         self,
         permissioned_user_id: str,
         keys: Sequence[SiteSettingsKey],
-        domain: Optional[str] = None,
+        domain: str,
     ) -> SiteSettingsEntryOverrides:
         """Stop a vault entry from overriding the listed settings, so it reads
         them from the domain settings again.
 
-        ``keys`` must name at least one setting. ``domain`` is optional while
-        the user ID has a single entry. Returns the settings the entry still
+        ``keys`` must name at least one setting. Returns the settings the entry still
         overrides.
         """
         if not permissioned_user_id:
             raise ValueError("permissioned_user_id is required to reset site overrides")
         if not keys:
             raise ValueError("keys must name at least one setting to reset")
+        if not domain:
+            raise ValueError("domain is required to reset site overrides")
         body: Dict[str, Any] = {
             "permissioned_user_id": permissioned_user_id,
             "keys": list(keys),
+            "domain": domain,
         }
-        if domain:
-            body["domain"] = domain
         response = self._make_request("PATCH", "/vault/site-settings/overrides", body)
         return _to_site_settings_entry_overrides(response)
