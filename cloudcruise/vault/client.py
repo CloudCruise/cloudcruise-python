@@ -134,9 +134,17 @@ def _to_vault_entry(data: Dict[str, Any]) -> VaultEntry:
 
 
 class VaultClient:
-    def __init__(self, make_request, encryption_key: str) -> None:
+    def __init__(self, make_request, encryption_key: Optional[str]) -> None:
         self._make_request = make_request
         self._encryption_key = encryption_key
+
+    def _key(self) -> str:
+        if not self._encryption_key:
+            raise ValueError(
+                "Missing encryptionKey. The vault encrypts credentials client-side; "
+                "provide params.encryption_key or the CLOUDCRUISE_ENCRYPTION_KEY env var."
+            )
+        return self._encryption_key
 
     def create(self, entry: VaultEntryInput) -> VaultEntry:
         """Create a vault entry.
@@ -146,9 +154,10 @@ class VaultClient:
         encrypted client-side before transport and decrypted on the response.
         """
         payload = _input_to_payload(entry)
-        processed = encrypt_sensitive_fields(payload, self._encryption_key)
+        key = self._key()
+        processed = encrypt_sensitive_fields(payload, key)
         response = self._make_request("POST", "/vault", processed)
-        decrypted = decrypt_sensitive_fields(response, self._encryption_key)
+        decrypted = decrypt_sensitive_fields(response, key)
         return _to_vault_entry(decrypted)
 
     def get(self, filters: Optional[GetVaultEntriesFilters] = None) -> List[VaultEntry]:
@@ -164,14 +173,14 @@ class VaultClient:
             qs = urlencode(params)
             path += f"?{qs}"
 
+        should_decrypt = not (filters and filters.decryptCredentials is False)
+        key = self._key() if should_decrypt else None
+
         response = self._make_request("GET", path)
         raw_entries = response if isinstance(response, list) else [response]
 
-        should_decrypt = not (filters and filters.decryptCredentials is False)
-        if should_decrypt:
-            raw_entries = [
-                decrypt_sensitive_fields(e, self._encryption_key) for e in raw_entries
-            ]
+        if key is not None:
+            raw_entries = [decrypt_sensitive_fields(e, key) for e in raw_entries]
         return [_to_vault_entry(e) for e in raw_entries]
 
     def update(self, entry: VaultEntryInput) -> VaultEntry:
@@ -182,9 +191,10 @@ class VaultClient:
         automatically.
         """
         payload = _input_to_payload(entry)
-        processed = encrypt_sensitive_fields(payload, self._encryption_key)
+        key = self._key()
+        processed = encrypt_sensitive_fields(payload, key)
         response = self._make_request("PUT", "/vault", processed)
-        decrypted = decrypt_sensitive_fields(response, self._encryption_key)
+        decrypted = decrypt_sensitive_fields(response, key)
         return _to_vault_entry(decrypted)
 
     def delete(self, params: Dict[str, str]) -> None:

@@ -43,10 +43,6 @@ class CloudCruise:
 
         if not api_key:
             raise ValueError("Missing apiKey. Provide via params.api_key or CLOUDCRUISE_API_KEY env var.")
-        if not encryption_key:
-            raise ValueError(
-                "Missing encryptionKey. Provide via params.encryption_key or CLOUDCRUISE_ENCRYPTION_KEY env var."
-            )
 
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")

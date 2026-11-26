@@ -46,6 +46,40 @@ print("Run completed:", result.status)
 print("Output data:", result.data)
 ```
 
+### Servers and Serverless Functions
+
+`runs.create()` queues a run and returns its session id without opening an event stream, so nothing is
+left connected when a request handler or a Lambda returns. Receive the result by webhook, or read it with
+`get_results()`. The client needs no `encryption_key` unless it uses the vault.
+
+```python
+import os
+
+from cloudcruise import CloudCruise, CloudCruiseParams
+from cloudcruise.runs.types import RunSpecificWebhook, StartRunRequest
+
+client = CloudCruise(CloudCruiseParams(api_key=os.environ["CLOUDCRUISE_API_KEY"]))
+
+created = client.runs.create(
+    StartRunRequest(
+        workflow_id="workflow-123",
+        run_input_variables={"USER": "permissioned-user-id"},
+        webhook=RunSpecificWebhook(
+            url="https://example.com/cloudcruise-webhook",
+            event_types_subscribed=["execution.success", "execution.failed", "execution.stopped"],
+            secret=os.environ["CLOUDCRUISE_WEBHOOK_SECRET"],
+            validity=3600,
+        ),
+    )
+)
+
+# In the webhook handler, verify the raw request body:
+event = client.webhook.verify_signature(raw_body, headers["x-hmac-signature"], os.environ["CLOUDCRUISE_WEBHOOK_SECRET"])
+
+# Or read the run directly:
+result = client.runs.get_results(created.session_id)
+```
+
 ### Realtime Event Streaming
 
 ```python
