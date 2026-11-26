@@ -33,6 +33,7 @@ __all__ = [
     "SseMessage",
     "RunEventEnvelope",
     # Convenience APIs
+    "create",
     "start",
     "subscribe_to_session",
     "submit_user_interaction",
@@ -46,6 +47,10 @@ __all__ = [
     "interrupt",
     "replay_webhooks",
 ]
+
+
+def create(request: StartRunRequest | Dict[str, Any]) -> StartRunResponse:
+    return _client().runs.create(request)
 
 
 def start(request: StartRunRequest | Dict[str, Any], options: Optional[RunStreamOptions] = None) -> RunHandle:

@@ -38,6 +38,7 @@ from ..utils.connection_manager import ConnectionManager, SessionSubscription
 from ..workflows.client import WorkflowsClient
 from .types import (
     StartRunRequest,
+    StartRunResponse,
     UserInteractionData,
     RunResult,
     WebhookReplayResponse,
@@ -60,6 +61,24 @@ class RunsClient:
         self._make_request = make_request
         self._workflows = workflows
         self._connection_manager = connection_manager
+
+    def create(self, request: StartRunRequest | Dict[str, Any]) -> StartRunResponse:
+        """Queue a run and return its session id, without opening an event stream.
+
+        Use it from servers and serverless functions that receive results by
+        webhook (``request.webhook``) or read them with :meth:`get_results`. The
+        API validates ``run_input_variables`` and rejects invalid input with
+        ``InputValidationError``.
+        """
+        from dataclasses import asdict, is_dataclass
+
+        payload = asdict(request) if is_dataclass(request) else dict(request)
+        payload.pop("client_id", None)
+        resp = self._make_request("POST", "/run", payload)
+        session_id = resp.get("session_id") if isinstance(resp, dict) else getattr(resp, "session_id", None)
+        if not session_id:
+            raise RuntimeError("CloudCruise create run response did not include session_id")
+        return StartRunResponse(session_id=session_id)
 
     def start(self, request: StartRunRequest | Dict[str, Any], options: Optional[RunStreamOptions] = None) -> RunHandle:
         if isinstance(request, dict):
